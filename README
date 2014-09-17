@@ -1,0 +1,6 @@
+This directory contains an mpi version of the matrix operations used in hybrid preconditioners.  
+
+This directory does not contains the data to be processed.
+
+The reduced normal matrix computed with this code will stored in the folder ReducedBlockMatrixG.
+
