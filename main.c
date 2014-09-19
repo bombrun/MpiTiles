@@ -121,7 +121,6 @@ int main(int argc, char **argv) {
     jdim = i1-i0;
     matrixCor[0] = malloc(sizeof(double)*idim*jdim);
     setBlockMatrix(matrixCor[0],i0,i1,i0,i1,matrixG,profileG_length,profileG);   
-    
     dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor[0],idim,jdim);
 //    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 //			  idim, jdim, profileAB_length,
