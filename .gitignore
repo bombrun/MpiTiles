@@ -1,6 +1,6 @@
 # Compiled source #
 ###################
-bigmatrixmpi
+*.mpi
 
 # Data  #
 #########

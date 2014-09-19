@@ -31,12 +31,14 @@ int main(int argc, char **argv) {
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* valuesG_file_name = "./data/NormalsG/values.txt";
     
-    const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
-    double* referenceMatrix = NULL;
-    
     int* profileG = NULL;
     int profileG_length, dimensionG;
     double* matrixG = NULL;
+    
+    const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
+    double* referenceMatrix = NULL;
+    
+    const char* reducedNormalMatrix_file_name = "./data/ReducedBlockMatrixGTest";
     
     int i, r; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
@@ -146,7 +148,7 @@ int main(int argc, char **argv) {
 //			  -1.0, matrixCGAB, idim,
 //			  matrixCGAB, jdim,
 //			  0.0,  matrixCor[0], idim );
-    saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],"./data/ReducedBlockMatrixG");
+    saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],reducedNormalMatrix_file_name);
     test = compareBlockMatrix(matrixCor[0],i0,i1,i0,i1,referenceMatrix,profileG_length,profileG_length,0.1);
     if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
     
@@ -175,7 +177,7 @@ int main(int argc, char **argv) {
 	setBlockMatrix(matrixCor[i],i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor[i],idim,jdim);
 	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);
-	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],"./data/ReducedBlockMatrixG");
+	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],reducedNormalMatrix_file_name);
 	
 	test = compareBlockMatrix(matrixCor[i],i0,i1,j0,j1,referenceMatrix,profileG_length,profileG_length,0.1);
 	if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
