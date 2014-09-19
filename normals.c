@@ -14,8 +14,6 @@
 #include <math.h> 
 #include "normals.h"
 
-#define OWNDGEMM
-
 int getNumberOfLine(const char* fileName) {
     int i=0;
 
@@ -136,7 +134,7 @@ int saveMatrixBlock(int i0, int i1, int j0, int j1, double * mat, const char* ou
     if (stat(outputLocation, &st) == -1) {
       mkdir(outputLocation, 0700);
     }
-    char *file_name = (char *)malloc(sizeof(char)*(strlen(outputLocation)+300));
+    char *file_name = malloc(sizeof(char)*(strlen(outputLocation)+300));
     sprintf(file_name,"%s/block%d-%d-%d-%d.txt",outputLocation,i0,i1,j0,j1);
     long i;
     FILE *fp;
@@ -201,19 +199,40 @@ int sumVectorInt(int *ma,int dim){
 /**
  * return Mij
  */
-double get(double * mat, int * sumProfile, int * profile, int i, int j){
-  if(i<j) {
-    return get(mat,sumProfile,profile,j,i);
+double getMij(double * mat, int * sumProfile, int * profile, int i, int j){
+  if(i>j) {
+    return getMij(mat,sumProfile,profile,j,i);
   } else {
-    int k = i-j;
-    if(k>profile[i]) {
+    int k = j-i;
+    if(k>=profile[j]) {
       return 0.0;
     } else {
-      return mat[sumProfile[i]-profile[i]+k];
+      return mat[sumProfile[j]-profile[j]+k];
     }
   }
   
 }
+
+
+/**
+ * set matOut with the value of matIn
+ * assume matOut is a sub matrx of matIn in block format with dimension i1-i0 x j1-j0 placed at i0,j0
+ * assume matIn is a matrix in band profile format with dimension dim associated to profile
+ */
+void setBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * matIn, int dim, int * profile){
+  int * sumProfile = malloc(sizeof(int)*dim);
+  setCumulative(sumProfile,profile,dim);
+  int i,j;
+  int jdim = j1-j0;
+  //printf("%d ",jdim);
+  for(i=i0;i<i1;i++){
+    for(j=j0;j<j1;j++){
+	matOut[(i-i0)*jdim+(j-j0)] = getMij(matIn,sumProfile,profile,i,j); // PB in the matOut structure (the size is ok but from i=5 j=5 get(i,j) is not located at the right place
+    }
+  }
+  free(sumProfile);
+}
+
 
 void setCumulative(int * sum,int * vec,int dim){
      int l,total;
@@ -225,19 +244,29 @@ void setCumulative(int * sum,int * vec,int dim){
 }
 
 /**
- * set matOut with the value of matIn
+ * compare matOut with the value of matIn
  * assume maout is a sub matrx of matIn in block format i0,i1 x j0,j1
+ * assume matIn is in row major format
+ * i.e. i0,i1 < idimIn and j0,j1 < jdimIn
+ * return the number of entries ij where (matOut_ij-matIn_ij)^2 > tol
  */
-void setBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * matIn, int dim, int * profile){
-  int * sumProfile = (int*)malloc(sizeof(int)*dim);
-  setCumulative(sumProfile,profile,dim);
+int compareBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * matIn, int idimIn, int jdimIn, double tol){
   int i,j;
   int jdim = j1-j0;
+  double diff, test;
+  int res = 0;
   for(i=i0;i<i1;i++){
-    for(j=0;j<j1;j++){
-	matOut[(i-i0)*jdim+(j-j0)]=get(matIn,sumProfile,profile,i,j);
+    for(j=j0;j<j1;j++){
+	diff = matOut[(i-i0)*jdim+(j-j0)]-matIn[i*jdimIn+j];
+	test = diff*diff;
+	if ( test > tol) {
+	  printf("block (%d,%d,%d,%d) entry (%d,%d) over (%d,%d) value=%f ref=%f (at %d)\n", i0, i1, j0, j1, i, j, idimIn, jdimIn, matOut[(i-i0)*jdim+(j-j0)], matIn[i*jdimIn+j], i*jdimIn+j);
+	  res += 1;
+	  exit(-1);
+	}
     }
   }
+  return res;
 }
 
 
@@ -284,7 +313,7 @@ int reduceRhs(double * ma, double * vec,int i0 ,int dim, int * profile) {
 /**
  * assume 
  */
-int dgemm(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, int n_col_b, double* matrixC, int n_row_c,int n_col_c){
+int dgemmAlex(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, int n_col_b, double* matrixC, int n_row_c,int n_col_c){
   int i,j,k;
   double stock;
   for(i=0;i<n_row_a;i++){
@@ -299,29 +328,3 @@ int dgemm(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, 
   return 0;
 }
 
-
-#ifdef OWNDGEMM
-void cblas_dgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA,
-            const enum CBLAS_TRANSPOSE TransB, const int M, const int N,
-            const int K, const double alpha, const double *A,
-            const int lda, const double *B, const int ldb,
-            const double beta, double *C, const int ldc) {
-
-    int i, j, k;
-    double stock;
-    
-    if ( (TransA == CblasNoTrans) && (TransB == CblasTrans)) {
-        for ( i = 0; i < M; i++ ) {
-            for ( j = 0; j < N; j++ ) {
-	       stock=0;
-                for ( k = 0; k < K; k++ )
-                {
-                    stock += A[ i * K + k ] * B[ j * K + k ];
-                }
-                C[ i * N + j ]+=alpha* stock;
-	    }
-	}
-    }
-
-}
-#endif

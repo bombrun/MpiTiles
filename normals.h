@@ -26,17 +26,19 @@ extern int sumVectorInt(int *ma,int dim);
  * */
 extern int reduceRhs(double * ma,double * vec,int i, int dim, int * profile);
 
-extern int dgemm(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, int n_col_b, double* matrixC, int n_row_c,int n_col_c);
+extern int dgemmAlex(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, int n_col_b, double* matrixC, int n_row_c,int n_col_c);
 
 /**
  * set matOut with the value of matIn
  * assume maout is a sub matrx of matIn in block format i0,i1 x j0,j1
  */
 extern void setBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * matIn, int dim, int * profile);
-
-
-extern void cblas_dgemm(const enum CBLAS_ORDER Order, const enum CBLAS_TRANSPOSE TransA,
-            const enum CBLAS_TRANSPOSE TransB, const int M, const int N,
-            const int K, const double alpha, const double *A,
-            const int lda, const double *B, const int ldb,
-            const double beta, double *C, const int ldc);
+extern double getMij(double * mat, int * sumProfile, int * profile, int i, int j);
+extern void setCumulative(int * sum,int * vec,int dim);
+/**
+ * compare matOut with the value of matIn
+ * assume maout is a sub matrx of matIn in block format i0,i1 x j0,j1
+ * assume matIn is in row major format
+ * return the number of entries ij where (matOut_ij-matIn_ij)^2 > tol
+ */
+int compareBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * matIn, int idim, int jdim, double tol);

@@ -21,3 +21,7 @@ int mpi_get_i1(int ng, int rang, int p){
       return (rang+1)*step;
     }
 }
+
+int mpi_get_total_blocks(int n){
+    return (n*(n+1))/2;
+}
