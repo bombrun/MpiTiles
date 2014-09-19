@@ -26,6 +26,9 @@ extern int sumVectorInt(int *ma,int dim);
  * */
 extern int reduceRhs(double * ma,double * vec,int i, int dim, int * profile);
 
+/**
+ * a simple dgemm for test
+ */
 extern int dgemmAlex(double *matrixA,int n_row_a,int n_col_a, double* matrixB,int n_row_b, int n_col_b, double* matrixC, int n_row_c,int n_col_c);
 
 /**

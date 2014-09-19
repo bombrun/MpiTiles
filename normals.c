@@ -1,8 +1,8 @@
 
 /*******************************************************************************
- * a code that compute the eigen value decomposition of a symmetric real matrix stored in an ASCII text file
- * by Alex Bombrun from MKL example
-*/
+ * some matrix util functions
+ * by Alex Bombrun
+ */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>

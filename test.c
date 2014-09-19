@@ -5,12 +5,17 @@
 
 #include "normals.h"
 #include "mpiutil.h"
-    
-/* Main program 
+
+/* Test program 
+ * compile with
+ *	make test
+ * run with
+ * 	mpirun -n 3  bigmatrixmpiTest
+ * 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
-  created 7/09/2014
+  
+  created 19/09/2014
   author Alex Bombrun
-  see TN APB-009
  */
 int main(int argc, char **argv) {
   
@@ -25,14 +30,14 @@ int main(int argc, char **argv) {
     // Normal matrix block G
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* valuesG_file_name = "./data/NormalsG/values.txt";
-      
+    
+    const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
+    double* referenceMatrix = NULL;
+    
     int* profileG = NULL;
     int profileG_length, dimensionG;
     double* matrixG = NULL;
     
-    const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
-    double* referenceMatrix = NULL;
-  
     int i, r; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
@@ -44,6 +49,9 @@ int main(int argc, char **argv) {
     int i_diag_block; // the diagonal block index
     
     int ierr = 0; // process error
+    
+    int test =0;
+    
     MPI_Status status,status2; 
     MPI_Request send_request,recv_request;
    
@@ -96,6 +104,7 @@ int main(int argc, char **argv) {
     MPI_Barrier(MPI_COMM_WORLD);
     printf("%d/%d: finished computing C-1ABG\n",rank,p);
       
+    
     int n_tasks=mpi_get_total_blocks(n_diag_blocks)/n_diag_blocks; // n_total_tasks/p or n_total_tasks/p+1
     int remainTasks=mpi_get_total_blocks(n_diag_blocks)%n_diag_blocks;
     
@@ -117,10 +126,19 @@ int main(int argc, char **argv) {
     printf("%d/%d: process %d tasks over %d communication tasks\n",rank,p,nTasks[rank],n_com_tasks);
     
     matrixCor = malloc(sizeof(double*)*nTasks[i_diag_block]);
+    // start by computing the diagonal block 
+    // change for dgemm
+    
     idim = i1-i0;
     jdim = i1-i0;
     matrixCor[0] = malloc(sizeof(double)*idim*jdim);
-    setBlockMatrix(matrixCor[0],i0,i1,i0,i1,matrixG,profileG_length,profileG);   
+    setBlockMatrix(matrixCor[0],i0,i1,i0,i1,matrixG,profileG_length,profileG);
+    
+//   int * sumProfile = malloc(sizeof(int)*profileG_length);
+//    setCumulative(sumProfile,profileG,profileG_length);
+//    printf("%d/%d: block (0,0)=%f set to %f\n",rank,p, getMij(matrixG,sumProfile,profileG,i0,i0), matrixCor[0][0]);
+ //   printf("%d/%d: block (5,5)=%f set to %f at %d\n",rank,p, getMij(matrixG,sumProfile,profileG,i0+5,i0+5), matrixCor[0][5*jdim+5],5*jdim+5);
+    
     
     dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor[0],idim,jdim);
 //    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
@@ -129,9 +147,12 @@ int main(int argc, char **argv) {
 //			  matrixCGAB, jdim,
 //			  0.0,  matrixCor[0], idim );
     saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],"./data/ReducedBlockMatrixG");
-   
+    test = compareBlockMatrix(matrixCor[0],i0,i1,i0,i1,referenceMatrix,profileG_length,profileG_length,0.1);
+    if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
+    
     MPI_Barrier(MPI_COMM_WORLD);
     printf("%d/%d: finished computing diagonal block of the correction\n",i_diag_block,p);
+    
 
     // loop over tasks
     for(i=1;i<n_com_tasks;i++){
@@ -141,6 +162,7 @@ int main(int argc, char **argv) {
       printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_diag_block, i0, i1, recv_tasks[i_diag_block][i], j0, j1);
       jdim =j1-j0;
       buffsize_in = (j1-j0)*profileAB_length;
+           
       matrixCGABj = malloc(buffsize_in*sizeof(double));
       ierr=MPI_Isend(matrixCGABi,buffsize_out,MPI_DOUBLE,send_tasks[rank][i],0,MPI_COMM_WORLD,&send_request); 
       printf("%d/%d: send data to %d\n",rank,p,send_tasks[rank][i]);
@@ -154,11 +176,14 @@ int main(int argc, char **argv) {
 	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor[i],idim,jdim);
 	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);
 	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],"./data/ReducedBlockMatrixG");
+	
+	test = compareBlockMatrix(matrixCor[i],i0,i1,j0,j1,referenceMatrix,profileG_length,profileG_length,0.1);
+	if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
       }
       free(matrixCGABj); 
       MPI_Barrier(MPI_COMM_WORLD); // do not start new tasks while there are running tasks
     }
-    
+    if(test==0) printf("%d/%d: all tests are successful\n",rank,p);
     MPI_Finalize();
     return ierr;
 }
