@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
 	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);
 	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],"./data/ReducedBlockMatrixG");
 	
-	test = compareBlockMatrix(matrixCor[0],i0,i1,j0,j1,referenceMatrix,profileG_length,profileG_length,0.1);
+	test = compareBlockMatrix(matrixCor[i],i0,i1,j0,j1,referenceMatrix,profileG_length,profileG_length,0.1);
 	if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
       }
       free(matrixCGABj); 
