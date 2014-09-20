@@ -45,7 +45,7 @@ int main(int argc, char **argv) {
     const char* row_prefix = "./data/SparseGtAB/row";
     const char* row_sufix = ".txt";
     
-    double** matrixCor = NULL;
+    double* matrixCor = NULL;
     double* matrixCGABi = NULL;
     double* matrixCGABj = NULL;
     
@@ -70,7 +70,7 @@ int main(int argc, char **argv) {
 	recv_tasks[r][i]=(r+i)%n_diag_blocks; // rotating permutation, from i=1 the process rank should ask the information at process rank+i mod p
       }
     }
-    printf("%d/%d: started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
+    printf("%d/%d: inde, started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
     printf("%d/%d: process %d tasks over %d communication tasks\n",rank,p,nTasks[rank],n_com_tasks);
     
     // set up the input matrices
@@ -93,6 +93,8 @@ int main(int argc, char **argv) {
     // diagonal block
     i0=mpi_get_i0(profileG_length,rank,p);
     i1=mpi_get_i1(profileG_length,rank,p);
+    idim = i1-i0;
+    jdim = i1-i0;
     printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
     matrixCGABi = malloc(sizeof(double)*(i1-i0)*profileAB_length);
     for(i=i0;i<i1;i++){
@@ -100,52 +102,51 @@ int main(int argc, char **argv) {
       sprintf(row_file_name,"%s%d%s",row_prefix,i,row_sufix);
       setRowWithSparseVectorDouble(matrixCGABi, i-i0, profileAB_length ,row_file_name);
       reduceRhs(matrixAB, matrixCGABi,i-i0,profileAB_length,profileAB);
+      free(row_file_name);
     }
     printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,i0,i1);
-    
-    matrixCor = malloc(sizeof(double*)*nTasks[i_diag_block]);
-    idim = i1-i0;
-    jdim = i1-i0;
-    matrixCor[0] = malloc(sizeof(double)*idim*jdim);
-    setBlockMatrix(matrixCor[0],i0,i1,i0,i1,matrixG,profileG_length,profileG);   
-    dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor[0],idim,jdim);
+    matrixCor = malloc(sizeof(double)*idim*jdim);
+    setBlockMatrix(matrixCor,i0,i1,i0,i1,matrixG,profileG_length,profileG);   
+    dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor,idim,jdim);
 //    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
 //			  idim, jdim, profileAB_length,
 //			  -1.0, matrixCGAB, idim,
 //			  matrixCGAB, jdim,
-//			  0.0,  matrixCor[0], idim );
-    saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],"./data/ReducedBlockMatrixG");
-    printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,i_diag_block,i_diag_block);
-    MPI_Barrier(MPI_COMM_WORLD);
+//			  0.0,  matrixCor, idim );
+    saveMatrixBlock(i0,i1,i0,i1,matrixCor,"./data/ReducedBlockMatrixG");
+    free(matrixCor);
+    printf("%d/%d: finished computing block (%d,%d)x(%d,%d) of the correction\n", rank, p, i0, i1, i0, i1);
     
     
     // off diagonal blocks
     for(i=1;i<n_com_tasks;i++){
-      j0 = mpi_get_i0(profileG_length,recv_tasks[i_diag_block][i],p);
-      j1 = mpi_get_i1(profileG_length,recv_tasks[i_diag_block][i],p);
-      printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_diag_block, i0, i1, recv_tasks[i_diag_block][i], j0, j1);
-      jdim =j1-j0;
-      matrixCGABj = malloc((j1-j0)*profileAB_length*sizeof(double));
-      for(j=j0;j<j1;j++){
-	char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
-	sprintf(row_file_name,"%s%d%s",row_prefix,j,row_sufix);
-	setRowWithSparseVectorDouble(matrixCGABj, j-j0, profileAB_length ,row_file_name);
-	reduceRhs(matrixAB, matrixCGABj,j-j0,profileAB_length,profileAB);
-      }
-      printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
-      if(i<nTasks[rank]){
-	matrixCor[i] = malloc(sizeof(double)*idim*jdim);
-	setBlockMatrix(matrixCor[i],i0,i1,j0,j1,matrixG,profileG_length,profileG);
-	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor[i],idim,jdim);
-	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);
-	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],"./data/ReducedBlockMatrixG");
-      }
-      free(matrixCGABj); 
       
+      if(i<nTasks[rank]){
+	j0 = mpi_get_i0(profileG_length,recv_tasks[i_diag_block][i],p);
+	j1 = mpi_get_i1(profileG_length,recv_tasks[i_diag_block][i],p);
+	printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_diag_block, i0, i1, recv_tasks[i_diag_block][i], j0, j1);
+	jdim =j1-j0;
+	matrixCGABj = malloc((j1-j0)*profileAB_length*sizeof(double));
+	for(j=j0;j<j1;j++){
+	  char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
+	  sprintf(row_file_name,"%s%d%s",row_prefix,j,row_sufix);
+	  setRowWithSparseVectorDouble(matrixCGABj, j-j0, profileAB_length ,row_file_name);
+	  reduceRhs(matrixAB, matrixCGABj,j-j0,profileAB_length,profileAB);
+	  free(row_file_name);
+	}
+	printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
+	matrixCor = malloc(sizeof(double)*idim*jdim);
+	setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
+	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor,idim,jdim);
+	saveMatrixBlock(i0,i1,j0,j1,matrixCor,"./data/ReducedBlockMatrixG");
+	printf("%d/%d: finished computing block (%d,%d)x(%d,%d) of the correction\n", rank, p, i0, i1, j0, j1);
+	free(matrixCor);
+	free(matrixCGABj); 
+      }
+     
     }
     
-    MPI_Barrier(MPI_COMM_WORLD); // the process are independent no blocking
-    MPI_Finalize();
+    MPI_Finalize(); // the process are independent no blocking
     return ierr;
 }
 

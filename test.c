@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     n_diag_blocks = p; // one diagonal block per process
     i_diag_block = rank; // the diagonal block index equals rank index
-    printf("%d/%d: started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
+    printf("%d/%d: test, started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
     
     profileAB_length = getNumberOfLine(profileAB_file_name);
     profileAB = malloc( sizeof(int) * profileAB_length );
