@@ -30,9 +30,6 @@ int main(int argc, char **argv) {
     int profileG_length, dimensionG;
     double* matrixG = NULL;
     
-    const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
-    double* referenceMatrix = NULL;
-  
     int i, r; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
@@ -61,7 +58,7 @@ int main(int argc, char **argv) {
     printf("%d/%d: started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
     
     profileAB_length = getNumberOfLine(profileAB_file_name);
-    profileAB = malloc( sizeof(int) * profileAB_length );
+    profileAB = calloc( profileAB_length , sizeof(int));
     readMatrixInt(profileAB,profileAB_file_name);
     dimensionAB = sumVectorInt(profileAB,profileAB_length);
     allocateMatrixDouble(&matrixAB,dimensionAB);
@@ -80,7 +77,7 @@ int main(int argc, char **argv) {
     i1=mpi_get_i1(profileG_length,rank,p);
     printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
     
-    matrixCGABi = malloc(sizeof(double)*(i1-i0)*profileAB_length);
+    matrixCGABi = calloc((i1-i0)*profileAB_length,sizeof(double));
     const char* row_prefix = "./data/SparseGtAB/row";
     const char* row_sufix = ".txt";
     for(i=i0;i<i1;i++){
@@ -115,7 +112,7 @@ int main(int argc, char **argv) {
     matrixCor = malloc(sizeof(double*)*nTasks[i_diag_block]);
     idim = i1-i0;
     jdim = i1-i0;
-    matrixCor[0] = malloc(sizeof(double)*idim*jdim);
+    matrixCor[0] = calloc(idim*jdim,sizeof(double));
     setBlockMatrix(matrixCor[0],i0,i1,i0,i1,matrixG,profileG_length,profileG);   
     dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor[0],idim,jdim);
 //    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
@@ -136,7 +133,7 @@ int main(int argc, char **argv) {
       printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_diag_block, i0, i1, recv_tasks[i_diag_block][i], j0, j1);
       jdim =j1-j0;
       buffsize_in = (j1-j0)*profileAB_length;
-      matrixCGABj = malloc(buffsize_in*sizeof(double));
+      matrixCGABj = calloc(buffsize_in,sizeof(double));
       ierr=MPI_Isend(matrixCGABi,buffsize_out,MPI_DOUBLE,send_tasks[rank][i],0,MPI_COMM_WORLD,&send_request); 
       printf("%d/%d: send data to %d\n",rank,p,send_tasks[rank][i]);
       ierr=MPI_Irecv(matrixCGABj,buffsize_in,MPI_DOUBLE,recv_tasks[rank][i],MPI_ANY_TAG,MPI_COMM_WORLD,&recv_request);
@@ -144,7 +141,7 @@ int main(int argc, char **argv) {
       ierr=MPI_Wait(&send_request,&status2); 
       printf("%d/%d: received data from %d\n",rank,p,recv_tasks[rank][i]);
       if(i<nTasks[rank]){
-	matrixCor[i] = malloc(sizeof(double)*idim*jdim);
+	matrixCor[i] = calloc(idim*jdim,sizeof(double));
 	setBlockMatrix(matrixCor[i],i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor[i],idim,jdim);
 	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);

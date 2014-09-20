@@ -21,6 +21,8 @@ extern int mpi_get_total_blocks(int n);
  */
 extern int mpi_get_diag_block_id(int i_diag_block,int diag_taks_id, int n_diag_blocks);
 
+extern int mpi_get_running_id(int r, int t, int p);
+
     
     
     // dispatch blocks of matrixCor between the process

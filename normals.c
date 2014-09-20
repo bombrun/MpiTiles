@@ -36,11 +36,11 @@ int getNumberOfLine(const char* fileName) {
 }
 
 void allocateMatrixDouble(double ** mat,int size) {
-    *mat = malloc(size*sizeof(double));
+    *mat = calloc(size,sizeof(double));
 }
 
 void allocateMatrixInt(int ** mat,int size) {
-    *mat = malloc(size*sizeof(int));
+    *mat = calloc(size,sizeof(int));
 }
 
 int readMatrixDouble(double * mat, const char* fileName) {
