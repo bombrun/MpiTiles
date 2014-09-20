@@ -5,6 +5,8 @@ debug:clean
 	$(CC) $(CFLAGS) -g -o bigmatrix.mpi main.c mpiutil.c normals.c
 stable:clean
 	$(CC) $(CFLAGS)    -o bigmatrix.mpi main.c mpiutil.c normals.c
+inde:clean
+	$(CC) $(CFLAGS)    -o bigmatrix.mpi mainInde.c mpiutil.c normals.c	
 test:clean
 	$(CC) $(CFLAGS) -g -o bigmatrixtest.mpi test.c mpiutil.c normals.c
 clean:
