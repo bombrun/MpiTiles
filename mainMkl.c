@@ -2,10 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
+#include <mkl.h>
 
 #include "normals.h"
 #include "mpiutil.h"
-
 
 /**
  * return the total number of diagonal block

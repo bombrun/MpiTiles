@@ -1,6 +1,3 @@
-// #define OWNDGEMM
-#include <cblas.h>
-
 /* Auxiliary routines prototypes */
 extern int getNumberOfLine(const char* fileName);
 extern void allocateMatrixDouble(double ** mat,int dimension);
