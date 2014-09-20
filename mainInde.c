@@ -5,7 +5,23 @@
 
 #include "normals.h"
 #include "mpiutil.h"
-    
+
+
+/**
+ * return the total number of diagonal block
+ * if not specify return p
+ */
+int get_n_blocks(int argc, char **argv, int p);
+
+/**
+ *  diagonal block distribution over all the process
+ */
+int get_n_pTasks(int p, int rank, int n_blocks);
+/**
+ *  tasks distribution over all the diagonal blocks
+ */
+int get_n_blockTasks(int i_block, int n_blocks);
+
 /* Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
   created 7/09/2014
@@ -30,7 +46,7 @@ int main(int argc, char **argv) {
     int profileG_length, dimensionG;
     double* matrixG = NULL;
   
-    int i, j, r, t; 	 // loop indices
+    int i, j, t; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
     int idim,jdim;
@@ -39,6 +55,8 @@ int main(int argc, char **argv) {
     
     int n_blocks; // block size or the number of diagonal blocks
     int i_block, j_block; // the diagonal block index
+    
+    int n_pTasks, n_blockTasks;
     
     int ierr = 0; // process error
    
@@ -52,49 +70,36 @@ int main(int argc, char **argv) {
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    n_blocks = 2*p; // one diagonal block per process
-    // diagonal block distribution over all the process
-    int remainBlocks = n_blocks%p;
-    int pTasks[p]; // number of diagonal blocks per process
-    for(r=0;r<p;r++){
-      pTasks[r] = n_blocks/p;
-      if (r<remainBlocks) pTasks[r]+=1;
-    }
-    printf("%d/%d: %d diagonal blocks\n", rank, p, pTasks[rank]);
     
-    // tasks distribution over all the diagonal blocks
-    int remainTasks=mpi_get_total_blocks(n_blocks)%n_blocks;
-    int nTasks[n_blocks]; // number of tasks for each diagonal block : n_total_tasks/p or n_total_tasks/p+1
-    for(r=0;r<n_blocks;r++){
-      nTasks[r] = mpi_get_total_blocks(n_blocks)/n_blocks;
-      if (r<remainTasks) nTasks[r]+=1;
-     }
+    n_blocks = get_n_blocks(argc,argv,p);
+    n_pTasks = get_n_pTasks(p,rank,n_blocks);
+   
+    // set up the input matrices
+    profileAB_length = getNumberOfLine(profileAB_file_name);
+    profileAB = calloc( profileAB_length ,sizeof(int) );
+    readMatrixInt(profileAB,profileAB_file_name);
+    dimensionAB = sumVectorInt(profileAB,profileAB_length);
+    allocateMatrixDouble(&matrixAB,dimensionAB);
+    readMatrixDouble(matrixAB,valuesAB_file_name);
       
-      // set up the input matrices
-      profileAB_length = getNumberOfLine(profileAB_file_name);
-      profileAB = calloc( profileAB_length ,sizeof(int) );
-      readMatrixInt(profileAB,profileAB_file_name);
-      dimensionAB = sumVectorInt(profileAB,profileAB_length);
-      allocateMatrixDouble(&matrixAB,dimensionAB);
-      readMatrixDouble(matrixAB,valuesAB_file_name);
+    profileG_length = getNumberOfLine(profileG_file_name);
+    allocateMatrixInt(&profileG,profileG_length);
+    readMatrixInt(profileG,profileG_file_name);
+    dimensionG = sumVectorInt(profileG,profileG_length);
+    allocateMatrixDouble(&matrixG,dimensionG);
+    readMatrixDouble(matrixG,valuesG_file_name);
       
-      profileG_length = getNumberOfLine(profileG_file_name);
-      allocateMatrixInt(&profileG,profileG_length);
-      readMatrixInt(profileG,profileG_file_name);
-      dimensionG = sumVectorInt(profileG,profileG_length);
-      allocateMatrixDouble(&matrixG,dimensionG);
-      readMatrixDouble(matrixG,valuesG_file_name);
-      
-      printf("%d/%d: number of attitude %d parameters, number of source global %d parameters\n", rank, p, profileAB_length, profileG_length);
+    printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
 	 
       
-   for(t=0;t<pTasks[rank];t++){
-      i_block = (rank+t*p); // the diagonal block index equals rank index
-      printf("%d/%d: inde, started, process diagonal block %d/%d, %d tasks\n",rank,p,i_block,n_blocks,nTasks[i_block]);
-     
+   for(t=0;t<n_pTasks;t++){
+      i_block = (rank+t*p); // the diagonal block index depends on the rank index and the task index
+      n_blockTasks = get_n_blockTasks(i_block,n_blocks);
       // diagonal block
       i0=mpi_get_i0(profileG_length,i_block,n_blocks);
       i1=mpi_get_i1(profileG_length,i_block,n_blocks);
+      printf("%d/%d: block %d/%d (%d,%d), %d tasks\n",rank,p,i_block,n_blocks,i0,i1,n_blockTasks);
+     
       idim = i1-i0;
       jdim = i1-i0;
       printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
@@ -106,7 +111,7 @@ int main(int argc, char **argv) {
 	reduceRhs(matrixAB, matrixCGABi,i-i0,profileAB_length,profileAB);
 	free(row_file_name);
       }
-      printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,i0,i1);
+      //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,i0,i1);
       matrixCor = calloc(idim*jdim,sizeof(double));
       setBlockMatrix(matrixCor,i0,i1,i0,i1,matrixG,profileG_length,profileG);   
       dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor,idim,jdim);
@@ -121,11 +126,11 @@ int main(int argc, char **argv) {
       
       
       // off diagonal blocks
-      for(i=1;i<nTasks[i_block];i++){
+      for(i=1;i<n_blockTasks;i++){
 	  j_block = mpi_get_diag_block_id(i_block, i, n_blocks);
 	  j0 = mpi_get_i0(profileG_length, j_block, n_blocks);
 	  j1 = mpi_get_i1(profileG_length, j_block, n_blocks);
-	  printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_block, i0, i1, j_block, j0, j1);
+	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  jdim =j1-j0;
 	  matrixCGABj = calloc((j1-j0)*profileAB_length,sizeof(double));
 	  for(j=j0;j<j1;j++){
@@ -135,12 +140,12 @@ int main(int argc, char **argv) {
 	    reduceRhs(matrixAB, matrixCGABj,j-j0,profileAB_length,profileAB);
 	    free(row_file_name);
 	  }
-	  printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
+	  //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
 	  matrixCor = calloc(idim*jdim,sizeof(double));
 	  setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	  dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor,idim,jdim);
 	  saveMatrixBlock(i0,i1,j0,j1,matrixCor,"./data/ReducedBlockMatrixG");
-	  printf("%d/%d: finished computing block (%d,%d)x(%d,%d) of the correction\n", rank, p, i0, i1, j0, j1);
+	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  free(matrixCor);
 	  free(matrixCGABj); 
       }
@@ -148,6 +153,39 @@ int main(int argc, char **argv) {
     }
     MPI_Finalize(); // the process are independent no blocking
     return ierr;
+}
+
+int get_n_blocks(int argc, char **argv, int p){
+  int n_blocks;
+  if (argc == 2) {
+      //const char* prog_name = *argv++;
+      //const char* nblocks_char = *argv;
+      n_blocks= (int) strtol(argv[1], NULL, 10);
+       if(n_blocks<p) {
+	printf("Configuration error: n_blocks %i is smaller than the number of process %d, set to default (the number of process)\n",n_blocks,p);
+	n_blocks = p; 
+      }
+    }
+    else {
+      n_blocks = p; // one diagonal block per process
+    }
+    return n_blocks;
+}
+
+int get_n_pTasks(int p, int rank, int n_blocks){
+    // diagonal block distribution over all the process
+    int remainBlocks = n_blocks%p;
+    int n_pTasks = n_blocks/p;
+    if (rank<remainBlocks) n_pTasks+=1;
+    return n_pTasks;
+}
+
+int get_n_blockTasks(int r, int n_blocks){
+   // tasks distribution over all the diagonal blocks
+    int remainTasks=mpi_get_total_blocks(n_blocks)%n_blocks;
+    int nTasks = mpi_get_total_blocks(n_blocks)/n_blocks;
+    if (r<remainTasks) nTasks+=1;
+    return nTasks;
 }
 
 
