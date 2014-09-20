@@ -25,3 +25,7 @@ int mpi_get_i1(int ng, int rang, int p){
 int mpi_get_total_blocks(int n){
     return (n*(n+1))/2;
 }
+
+int mpi_get_diag_block_id(int i_diag_block,int diag_taks_id, int n_diag_blocks){
+    return (i_diag_block+diag_taks_id)%n_diag_blocks;
+}

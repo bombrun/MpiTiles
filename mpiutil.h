@@ -16,7 +16,10 @@ extern int mpi_get_i1(int ng, int rang, int p);
  */
 extern int mpi_get_total_blocks(int n);
 
-
+/**
+ * rotating permutation
+ */
+extern int mpi_get_diag_block_id(int i_diag_block,int diag_taks_id, int n_diag_blocks);
 
     
     

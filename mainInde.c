@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     int rank, p;  // rank and number of mpi process
     
     int n_diag_blocks; // the total number of diagonal blocks
-    int i_diag_block; // the diagonal block index
+    int i_block, j_block; // the diagonal block index
     
     int ierr = 0; // process error
    
@@ -53,25 +53,18 @@ int main(int argc, char **argv) {
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     n_diag_blocks = p; // one diagonal block per process
-    i_diag_block = rank; // the diagonal block index equals rank index
+    i_block = rank; // the diagonal block index equals rank index
     
     // blocks and tasks distribution over all the process
-    int n_tasks=mpi_get_total_blocks(n_diag_blocks)/n_diag_blocks; // n_total_tasks/p or n_total_tasks/p+1
     int remainTasks=mpi_get_total_blocks(n_diag_blocks)%n_diag_blocks;
-    int nTasks[n_diag_blocks];
-    int n_com_tasks=mpi_get_total_blocks(n_diag_blocks)/n_diag_blocks+1;
-    int recv_tasks[n_diag_blocks][n_com_tasks];
-    for(r=0;r<p;r++){
-      nTasks[r] = n_tasks;
+    int nTasks[n_diag_blocks]; // number of tasks for each diagonal block : n_total_tasks/p or n_total_tasks/p+1
+    int max_tasks_per_diag_block=mpi_get_total_blocks(n_diag_blocks)/n_diag_blocks+1;
+    for(r=0;r<n_diag_blocks;r++){
+      nTasks[r] = mpi_get_total_blocks(n_diag_blocks)/n_diag_blocks;
       if (r<remainTasks) nTasks[r]+=1;
     }
-    for(r=0;r<n_diag_blocks;r++){
-      for(i=0;i<n_com_tasks;i++){
-	recv_tasks[r][i]=(r+i)%n_diag_blocks; // rotating permutation, from i=1 the process rank should ask the information at process rank+i mod p
-      }
-    }
-    printf("%d/%d: inde, started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
-    printf("%d/%d: process %d tasks over %d communication tasks\n",rank,p,nTasks[rank],n_com_tasks);
+    printf("%d/%d: inde, started, process diagonal block %d/%d\n",rank,p,i_block,n_diag_blocks);
+    printf("%d/%d: process %d tasks\n",rank,p,nTasks[i_block]);
     
     // set up the input matrices
     profileAB_length = getNumberOfLine(profileAB_file_name);
@@ -91,8 +84,8 @@ int main(int argc, char **argv) {
     printf("%d/%d: number of attitude %d parameters, number of source global %d parameters\n", rank, p, profileAB_length, profileG_length);
         
     // diagonal block
-    i0=mpi_get_i0(profileG_length,rank,p);
-    i1=mpi_get_i1(profileG_length,rank,p);
+    i0=mpi_get_i0(profileG_length,i_block,n_diag_blocks);
+    i1=mpi_get_i1(profileG_length,i_block,n_diag_blocks);
     idim = i1-i0;
     jdim = i1-i0;
     printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
@@ -119,12 +112,13 @@ int main(int argc, char **argv) {
     
     
     // off diagonal blocks
-    for(i=1;i<n_com_tasks;i++){
+    for(i=1;i<max_tasks_per_diag_block;i++){
       
-      if(i<nTasks[rank]){
-	j0 = mpi_get_i0(profileG_length,recv_tasks[i_diag_block][i],p);
-	j1 = mpi_get_i1(profileG_length,recv_tasks[i_diag_block][i],p);
-	printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_diag_block, i0, i1, recv_tasks[i_diag_block][i], j0, j1);
+      if(i<nTasks[i_block]){
+	j_block = mpi_get_diag_block_id(i_block, i, n_diag_blocks);
+	j0 = mpi_get_i0(profileG_length, j_block, n_diag_blocks);
+	j1 = mpi_get_i1(profileG_length, j_block, n_diag_blocks);
+	printf("%d/%d: diagonal block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	jdim =j1-j0;
 	matrixCGABj = malloc((j1-j0)*profileAB_length*sizeof(double));
 	for(j=j0;j<j1;j++){
