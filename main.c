@@ -58,17 +58,17 @@ int main(int argc, char **argv) {
     printf("%d/%d: started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
     
     profileAB_length = getNumberOfLine(profileAB_file_name);
-    profileAB = calloc( profileAB_length , sizeof(int));
+    profileAB = malloc( sizeof(int) * profileAB_length );
     readMatrixInt(profileAB,profileAB_file_name);
     dimensionAB = sumVectorInt(profileAB,profileAB_length);
-    allocateMatrixDouble(&matrixAB,dimensionAB);
+    matrixAB = calloc(dimensionAB,sizeof(double));
     readMatrixDouble(matrixAB,valuesAB_file_name);
     
     profileG_length = getNumberOfLine(profileG_file_name);
-    allocateMatrixInt(&profileG,profileG_length);
+    profileG = malloc( sizeof(int) * profileG_length );
     readMatrixInt(profileG,profileG_file_name);
     dimensionG = sumVectorInt(profileG,profileG_length);
-    allocateMatrixDouble(&matrixG,dimensionG);
+    matrixG = calloc(dimensionG,sizeof(double));
     readMatrixDouble(matrixG,valuesG_file_name);
     
     printf("%d/%d: number of attitude %d parameters, number of source global %d parameters\n", rank, p, profileAB_length, profileG_length);

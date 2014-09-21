@@ -1,7 +1,5 @@
 /* Auxiliary routines prototypes */
 extern int getNumberOfLine(const char* fileName);
-extern void allocateMatrixDouble(double ** mat,int dimension);
-extern void allocateMatrixInt(int ** mat,int dimension);
 extern int readMatrixDouble(double * mat,const char* fileName);
 extern int readMatrixInt(int * mat,const char* fileName);
 

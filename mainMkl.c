@@ -89,7 +89,7 @@ int main(int argc, char **argv) {
     allocateMatrixDouble(&matrixG,dimensionG);
     readMatrixDouble(matrixG,valuesG_file_name);
       
-    printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
+    printf("%d/%d: inde mkl, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
 	 
       
    for(t=0;t<n_pTasks;t++){
