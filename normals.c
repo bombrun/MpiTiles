@@ -61,6 +61,7 @@ int readMatrixDouble(double * mat, const char* fileName) {
 
 /**
  * set the row i0 of the matrix mat with the value of the sparse vector stored in filename
+ * MEMORY PROBLEM HERE
  */
 int setRowWithSparseVectorDouble(double * mat,int row_i, int row_length, const char* fileName) {
     FILE *fp;
@@ -74,21 +75,15 @@ int setRowWithSparseVectorDouble(double * mat,int row_i, int row_length, const c
 
     int i;
     double val;
+    
+   
     while ((read = getline(&line, &len, fp)) != -1) {
-        //printf("Retrieved line of length %zu :\n", read);
-        //printf("%s", line);
-      
+	// MEMORY PB start here
 	i = atoi(strsep(&line, ";"));
 	val = atof(strsep(&line, ";"));
-	//while ((token = strsep(&line, ";")) != NULL)
-	//{
-	//  printf("%s\n", token);
-	//}
-        
+	// FINISHED here if one set i and val without string functions then the memory is stable!!!
         mat[i+row_i*row_length] = val;
-        //i++;
     }
-
     free(line);
     fclose(fp);
     return 0;

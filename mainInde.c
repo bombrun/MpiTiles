@@ -102,8 +102,14 @@ int main(int argc, char **argv) {
     //profileG_length  = setMatrixNormal(G_location,profileG,matrixG);
     
     printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
-	 
-      
+
+// Memory test
+//     i0=mpi_get_i0(profileG_length,0,n_blocks);
+//     i1=mpi_get_i1(profileG_length,0,n_blocks);
+//     matrixCGABi = calloc(2*(i1-i0)*profileAB_length,sizeof(double));
+//    matrixCGABj = calloc(2*(i1-i0)*profileAB_length,sizeof(double));
+//     matrixCor = calloc(4*(i1-i0)*(i1-i0),sizeof(double));
+     
    for(t=0;t<n_pTasks;t++){
       i_block = (rank+t*p); // the diagonal block index depends on the rank index and the task index
       n_blockTasks = get_n_blockTasks(i_block,n_blocks);
@@ -140,7 +146,9 @@ int main(int argc, char **argv) {
 	  saveMatrixBlock(i0,i1,j0,j1,matrixCor,"./data/ReducedBlockMatrixG");
 	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  free(matrixCor);
-	  free(matrixCGABj); 
+	  free(matrixCGABj);
+	  //MPI_Barrier(MPI_COMM_WORLD); // to prevent memory acess to the same file -> useless does not improve things
+
       }
       free(matrixCGABi); 
     }
@@ -211,7 +219,7 @@ void reduce(int length, int* profile, double* values, double* matrix, int i0, in
       for(i=i0;i<i1;i++){
 	char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
 	sprintf(row_file_name,"%s%d%s",row_prefix,i,row_sufix);
-	setRowWithSparseVectorDouble(matrix, i-i0, length ,row_file_name);
+	setRowWithSparseVectorDouble(matrix, i-i0, length ,row_file_name); // MEMORY PROBLEM HERE! : if commented the memory size is stable!!!
 	reduceRhs(values, matrix,i-i0,length,profile);
 	free(row_file_name);
       } 
