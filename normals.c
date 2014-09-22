@@ -66,23 +66,26 @@ int readMatrixDouble(double * mat, const char* fileName) {
 int setRowWithSparseVectorDouble(double * mat,int row_i, int row_length, const char* fileName) {
     FILE *fp;
     char *line = NULL;
+    char *ptr; // to store the line first position
     size_t len = 0;
     ssize_t read;
 
     fp = fopen(fileName, "r");
     if (fp == NULL)
         return -1;
-
     int i;
     double val;
-    
-   
+       
     while ((read = getline(&line, &len, fp)) != -1) {
+	ptr = line;
 	// MEMORY PB start here
 	i = atoi(strsep(&line, ";"));
 	val = atof(strsep(&line, ";"));
+	line = ptr;
 	// FINISHED here if one set i and val without string functions then the memory is stable!!!
         mat[i+row_i*row_length] = val;
+	//free(line);
+	
     }
     free(line);
     fclose(fp);
