@@ -74,19 +74,19 @@ int main(int argc, char **argv) {
     n_blocks = get_n_blocks(argc,argv,p);
     n_pTasks = get_n_pTasks(p,rank,n_blocks);
    
-    // set up the input matrices
+     // set up the input matrices
     profileAB_length = getNumberOfLine(profileAB_file_name);
-    profileAB = calloc( profileAB_length ,sizeof(int) );
+    profileAB = malloc( sizeof(int) * profileAB_length );
     readMatrixInt(profileAB,profileAB_file_name);
     dimensionAB = sumVectorInt(profileAB,profileAB_length);
-    allocateMatrixDouble(&matrixAB,dimensionAB);
+    matrixAB = calloc(dimensionAB,sizeof(double));
     readMatrixDouble(matrixAB,valuesAB_file_name);
-      
+    
     profileG_length = getNumberOfLine(profileG_file_name);
-    allocateMatrixInt(&profileG,profileG_length);
+    profileG = malloc( sizeof(int) * profileG_length );
     readMatrixInt(profileG,profileG_file_name);
     dimensionG = sumVectorInt(profileG,profileG_length);
-    allocateMatrixDouble(&matrixG,dimensionG);
+    matrixG = calloc(dimensionG,sizeof(double));
     readMatrixDouble(matrixG,valuesG_file_name);
       
     printf("%d/%d: inde mkl, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
@@ -143,7 +143,7 @@ int main(int argc, char **argv) {
 	  //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
 	  matrixCor = calloc(idim*jdim,sizeof(double));
 	  setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
-	   cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
+	  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
                    idim, jdim, profileAB_length,
                    -1.0, matrixCGABi, profileAB_length,
                    matrixCGABj, profileAB_length,
