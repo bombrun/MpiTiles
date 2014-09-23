@@ -6,6 +6,16 @@
 
 #include "normals.h"
 #include "mpiutil.h"
+#include "matrixBlockStore.h"
+
+/**
+ * (lengh, profile, values) define the cholesky factor C of a normal matrix N
+ * 
+ * matrix defines a matrix M in row major format with i1-i0 rows with the same lengh than N
+ *
+ * return M=C-1M, change the values of the input matrix  
+ */
+void reduce(int length, int* profile, double* values, double* matrix, int i0, int i1);
 
 /* Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
@@ -52,6 +62,8 @@ int main(int argc, char **argv) {
     double* matrixCGABi = NULL;
     double* matrixCGABj = NULL;
     
+    FILE* store = NULL;
+    
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -85,6 +97,8 @@ int main(int argc, char **argv) {
       i1=mpi_get_i1(profileG_length,i_block,n_blocks);
       printf("%d/%d: block %d/%d (%d,%d), %d tasks\n",rank,p,i_block,n_blocks,i0,i1,n_blockTasks);
      
+      openStore(&store,i_block,"./data/ReducedNormals");
+      
       idim = i1-i0;
       jdim = i1-i0;
       printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
@@ -99,7 +113,7 @@ int main(int argc, char **argv) {
                    matrixCGABi, profileAB_length,
                    1.0,  matrixCor, idim );
       
-      saveMatrixBlock(i0,i1,i0,i1,matrixCor,"./data/ReducedBlockMatrixG");
+      saveBlock(i0,i1,i0,i1,matrixCor,store);
       free(matrixCor);
      printf("%d/%d: block %d/%d (%d,%d) finished self link\n",rank,p,i_block,n_blocks,i0,i1);
       
@@ -122,11 +136,12 @@ int main(int argc, char **argv) {
                    -1.0, matrixCGABi, profileAB_length,
                    matrixCGABj, profileAB_length,
                    1.0,  matrixCor, jdim );
-	  saveMatrixBlock(i0,i1,j0,j1,matrixCor,"./data/ReducedBlockMatrixG");
+	   saveBlock(i0,i1,j0,j1,matrixCor,store);
 	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  free(matrixCor);
 	  free(matrixCGABj); 
       }
+      closeStore(&store);
       free(matrixCGABi); 
     }
     MPI_Finalize(); // the process are independent no blocking
