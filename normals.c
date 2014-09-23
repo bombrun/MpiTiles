@@ -260,6 +260,19 @@ int compareBlockMatrix(double *matOut, int i0,int i1,int j0, int j1,double * mat
 }
 
 
+void reduce(int length, int* profile, double* values, const char* location, double* matrix, int i0, int i1){
+      const char* row_prefix = "row";
+      const char* row_sufix = ".txt";
+      int i;
+      for(i=i0;i<i1;i++){
+	char *row_file_name = malloc(sizeof(char)*(strlen(location)+strlen(row_prefix)+strlen(row_sufix)+10));
+	sprintf(row_file_name,"%s/%s%d%s",location, row_prefix,i,row_sufix);
+	setRowWithSparseVectorDouble(matrix, i-i0, length ,row_file_name);
+	reduceRhs(values, matrix,i-i0,length,profile);
+	free(row_file_name);
+      } 
+}
+
 /**
  * Assume the matrix reduced
  * reduced vector vec

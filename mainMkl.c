@@ -2,20 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <mpi.h>
-#include <mkl.h>
 
 #include "normals.h"
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
-
-/**
- * (lengh, profile, values) define the cholesky factor C of a normal matrix N
- * 
- * matrix defines a matrix M in row major format with i1-i0 rows with the same lengh than N
- *
- * return M=C-1M, change the values of the input matrix  
- */
-void reduce(int length, int* profile, double* values, double* matrix, int i0, int i1);
 
 /* Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
@@ -40,7 +30,9 @@ int main(int argc, char **argv) {
     int* profileG = NULL;
     int profileG_length, dimensionG;
     double* matrixG = NULL;
-  
+    
+    const char* matrixGtAB_location = "./data/SparseGtAB";
+      
     int i, j, t; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
@@ -54,9 +46,6 @@ int main(int argc, char **argv) {
     int n_pTasks, n_blockTasks;
     
     int ierr = 0; // process error
-   
-    const char* row_prefix = "./data/SparseGtAB/row";
-    const char* row_sufix = ".txt";
     
     double* matrixCor = NULL;
     double* matrixCGABi = NULL;
@@ -103,7 +92,7 @@ int main(int argc, char **argv) {
       jdim = i1-i0;
       printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
       matrixCGABi = calloc((i1-i0)*profileAB_length,sizeof(double));
-      reduce(profileAB_length, profileAB, matrixAB, matrixCGABi, i0, i1);
+      reduce(profileAB_length, profileAB, matrixAB, matrixGtAB_location, matrixCGABi, i0, i1);
       
       matrixCor = calloc(idim*jdim,sizeof(double));
       setBlockMatrix(matrixCor,i0,i1,i0,i1,matrixG,profileG_length,profileG);   
@@ -114,9 +103,8 @@ int main(int argc, char **argv) {
                    1.0,  matrixCor, idim );
       
       saveBlock(i0,i1,i0,i1,matrixCor,store);
+      printf("%d/%d: block %d/%d (%d,%d) finished self link\n",rank,p,i_block,n_blocks,i0,i1);
       free(matrixCor);
-     printf("%d/%d: block %d/%d (%d,%d) finished self link\n",rank,p,i_block,n_blocks,i0,i1);
-      
       
       // off diagonal blocks
       for(i=1;i<n_blockTasks;i++){
@@ -126,9 +114,8 @@ int main(int argc, char **argv) {
 	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  jdim =j1-j0;
 	  matrixCGABj = calloc((j1-j0)*profileAB_length,sizeof(double));
-	  reduce(profileAB_length, profileAB, matrixAB, matrixCGABj, i0, i1);
+	  reduce(profileAB_length, profileAB, matrixAB, matrixGtAB_location, matrixCGABj, j0, j1);
 	  
-	  //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
 	  matrixCor = calloc(idim*jdim,sizeof(double));
 	  setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	  cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
@@ -137,9 +124,9 @@ int main(int argc, char **argv) {
                    matrixCGABj, profileAB_length,
                    1.0,  matrixCor, jdim );
 	   saveBlock(i0,i1,j0,j1,matrixCor,store);
-	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
-	  free(matrixCor);
-	  free(matrixCGABj); 
+	   printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
+	   free(matrixCor);
+	   free(matrixCGABj); 
       }
       closeStore(&store);
       free(matrixCGABi); 
@@ -147,17 +134,3 @@ int main(int argc, char **argv) {
     MPI_Finalize(); // the process are independent no blocking
     return ierr;
 }
-
-void reduce(int length, int* profile, double* values, double* matrix, int i0, int i1){
-      const char* row_prefix = "./data/SparseGtAB/row";
-      const char* row_sufix = ".txt";
-      int i;
-      for(i=i0;i<i1;i++){
-	char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
-	sprintf(row_file_name,"%s%d%s",row_prefix,i,row_sufix);
-	setRowWithSparseVectorDouble(matrix, i-i0, length ,row_file_name); // MEMORY PROBLEM HERE! : if commented the memory size is stable!!!
-	reduceRhs(values, matrix,i-i0,length,profile);
-	free(row_file_name);
-      } 
-}
-

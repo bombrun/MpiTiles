@@ -15,6 +15,16 @@ extern int printVectorDouble(double * ma,int dim);
 extern int printVectorInt(int * ma,int dim);
 extern int sumVectorInt(int *ma,int dim);
 
+
+/**
+ * (lengh, profile, values) define the cholesky factor C of a normal matrix N
+ * 
+ * matrix defines a matrix M in row major format with i1-i0 rows with the same lengh than N
+ *
+ * return M=C-1M, change the values of the input matrix  
+ */
+void reduce(int length, int* profile, double* values, const char* location, double* matrix, int i0, int i1);
+
 /**
  * Assume the matrix is a cholesky factor C, compute x, such that C x = vec
  * the value of x is stored in vec
