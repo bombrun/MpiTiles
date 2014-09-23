@@ -12,7 +12,7 @@ stable:clean
 	$(CC) $(CFLAGS)    -o bigmatrix.mpi main.c mpiutil.c normals.c
 	
 inde:clean
-	$(CC) $(CFLAGS)    -o bigmatrix.mpi mainInde.c mpiutil.c normals.c
+	$(CC) $(CFLAGS)    -o bigmatrix.mpi mainInde.c mpiutil.c normals.c matrixBlockStore.c
 	
 mkl:clean
 	$(MKLCC) $(MKLCFLAGS) -o bigmatrix.mpi  mainMkl.c mpiutil.c normals.c $(MKLLDFLAGS)
