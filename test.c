@@ -5,7 +5,7 @@
 
 #include "normals.h"
 #include "mpiutil.h"
-
+#include "matrixBlockStore.h"
 /* Test program 
  * compile with
  *	make test
@@ -63,13 +63,15 @@ int main(int argc, char **argv) {
     double* matrixCGABi = NULL;
     double* matrixCGABj = NULL;
     
+    FILE* store;
+    
     MPI_Init(&argc,&argv);
     MPI_Comm_size(MPI_COMM_WORLD, &p);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     n_diag_blocks = p; // one diagonal block per process
     i_diag_block = rank; // the diagonal block index equals rank index
     printf("%d/%d: test, started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
-    
+    openStore(&store,rank,"./data/ReducedNormalsTest");
     profileAB_length = getNumberOfLine(profileAB_file_name);
     profileAB = malloc( sizeof(int) * profileAB_length );
     readMatrixInt(profileAB,profileAB_file_name);
@@ -148,7 +150,8 @@ int main(int argc, char **argv) {
 //			  -1.0, matrixCGAB, idim,
 //			  matrixCGAB, jdim,
 //			  0.0,  matrixCor[0], idim );
-    saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],reducedNormalMatrix_file_name);
+//    saveMatrixBlock(i0,i1,i0,i1,matrixCor[0],reducedNormalMatrix_file_name);
+    saveBlock(i0,i1,i0,i1,matrixCor[0],store);
     test = compareBlockMatrix(matrixCor[0],i0,i1,i0,i1,referenceMatrix,profileG_length,profileG_length,0.1);
     if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
     
@@ -177,9 +180,9 @@ int main(int argc, char **argv) {
 	setBlockMatrix(matrixCor[i],i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor[i],idim,jdim);
 	printf("%d/%d: finished computing block %d,%d of the correction\n",rank,p,rank,recv_tasks[rank][i]);
-	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],reducedNormalMatrix_file_name);
-	
+//	saveMatrixBlock(i0,i1,j0,j1,matrixCor[i],reducedNormalMatrix_file_name);
 	test = compareBlockMatrix(matrixCor[i],i0,i1,j0,j1,referenceMatrix,profileG_length,profileG_length,0.1);
+	saveBlock(i0,i1,j0,j1,matrixCor[i],store);
 	if(test>0)  printf("%d/%d: ERROR the computed matrix is not equal to the reference matrix \n",rank,p);
       }
       free(matrixCGABj); 

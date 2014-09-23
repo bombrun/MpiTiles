@@ -5,13 +5,12 @@
 
 #include "normals.h"
 #include "mpiutil.h"
-
 #include "matrixBlockStore.h"
 
 /**
  * NOT WORKING
  */
-int setMatrixNormal(const char* location,int* profile, double* values);
+int setMatrixNormal(const char* location,int** profile, double** values);
 
 /**
  * (lengh, profile, values) define the cholesky factor C of a normal matrix N
@@ -93,7 +92,7 @@ int main(int argc, char **argv) {
     matrixG = calloc(dimensionG,sizeof(double));
     readMatrixDouble(matrixG,valuesG_file_name);
       
-    //profileAB_length = setMatrixNormal(AB_location,profileAB,matrixAB);
+    //profileAB_length = setMatrixNormal(AB_location,&profileAB,&matrixAB);
     //profileG_length  = setMatrixNormal(G_location,profileG,matrixG);
     
     printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
@@ -151,7 +150,7 @@ int main(int argc, char **argv) {
     return ierr;
 }
 
-int setMatrixNormal(const char* location,int* profile, double* values){
+int setMatrixNormal(const char* location, int** profile, double** values){
   // WOULD BE NICE BUT IT IS NOT WORKING, allocation setting in the same function seems to be tricky in C
     char* profile_file_name=  malloc(sizeof(char)*(strlen(location)+strlen("profile.txt")));
     char* values_file_name =  malloc(sizeof(char)*(strlen(location)+strlen("values.txt")));
@@ -161,12 +160,12 @@ int setMatrixNormal(const char* location,int* profile, double* values){
     sprintf(values_file_name,"%s/%s",location,"values.txt");
  
     profile_length = getNumberOfLine(profile_file_name);
-    profile = calloc( profile_length ,sizeof(int) );
-    readMatrixInt(profile,profile_file_name);
+    *profile = calloc( profile_length ,sizeof(int) );
+    readMatrixInt(*profile,profile_file_name);
     
-    size = sumVectorInt(profile,profile_length);
-    values = calloc( size, sizeof(double));
-    readMatrixDouble(values,values_file_name);
+    size = sumVectorInt(*profile,profile_length);
+    *values = calloc( size, sizeof(double));
+    readMatrixDouble(*values,values_file_name);
      
     free(profile_file_name);
     free(values_file_name);
