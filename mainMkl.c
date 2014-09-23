@@ -7,21 +7,6 @@
 #include "normals.h"
 #include "mpiutil.h"
 
-/**
- * return the total number of diagonal block
- * if not specify return p
- */
-int get_n_blocks(int argc, char **argv, int p);
-
-/**
- *  diagonal block distribution over all the process
- */
-int get_n_pTasks(int p, int rank, int n_blocks);
-/**
- *  tasks distribution over all the diagonal blocks
- */
-int get_n_blockTasks(int i_block, int n_blocks);
-
 /* Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
   created 7/09/2014
@@ -104,14 +89,8 @@ int main(int argc, char **argv) {
       jdim = i1-i0;
       printf("%d/%d: process rows from %d to %d\n",rank,p,i0,i1);
       matrixCGABi = calloc((i1-i0)*profileAB_length,sizeof(double));
-      for(i=i0;i<i1;i++){
-	char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
-	sprintf(row_file_name,"%s%d%s",row_prefix,i,row_sufix);
-	setRowWithSparseVectorDouble(matrixCGABi, i-i0, profileAB_length ,row_file_name);
-	reduceRhs(matrixAB, matrixCGABi,i-i0,profileAB_length,profileAB);
-	free(row_file_name);
-      }
-      //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,i0,i1);
+      reduce(profileAB_length, profileAB, matrixAB, matrixCGABi, i0, i1);
+      
       matrixCor = calloc(idim*jdim,sizeof(double));
       setBlockMatrix(matrixCor,i0,i1,i0,i1,matrixG,profileG_length,profileG);   
       cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
@@ -133,13 +112,8 @@ int main(int argc, char **argv) {
 	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  jdim =j1-j0;
 	  matrixCGABj = calloc((j1-j0)*profileAB_length,sizeof(double));
-	  for(j=j0;j<j1;j++){
-	    char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
-	    sprintf(row_file_name,"%s%d%s",row_prefix,j,row_sufix);
-	    setRowWithSparseVectorDouble(matrixCGABj, j-j0, profileAB_length ,row_file_name);
-	    reduceRhs(matrixAB, matrixCGABj,j-j0,profileAB_length,profileAB);
-	    free(row_file_name);
-	  }
+	  reduce(profileAB_length, profileAB, matrixAB, matrixCGABj, i0, i1);
+	  
 	  //printf("%d/%d: finished computing C-1ABG block (%d,%d) \n",rank,p,j0,j1);
 	  matrixCor = calloc(idim*jdim,sizeof(double));
 	  setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
@@ -159,37 +133,16 @@ int main(int argc, char **argv) {
     return ierr;
 }
 
-int get_n_blocks(int argc, char **argv, int p){
-  int n_blocks;
-  if (argc == 2) {
-      //const char* prog_name = *argv++;
-      //const char* nblocks_char = *argv;
-      n_blocks= (int) strtol(argv[1], NULL, 10);
-       if(n_blocks<p) {
-	printf("Configuration error: n_blocks %i is smaller than the number of process %d, set to default (the number of process)\n",n_blocks,p);
-	n_blocks = p; 
-      }
-    }
-    else {
-      n_blocks = p; // one diagonal block per process
-    }
-    return n_blocks;
+void reduce(int length, int* profile, double* values, double* matrix, int i0, int i1){
+      const char* row_prefix = "./data/SparseGtAB/row";
+      const char* row_sufix = ".txt";
+      int i;
+      for(i=i0;i<i1;i++){
+	char *row_file_name = malloc(sizeof(char)*(strlen(row_prefix)+strlen(row_sufix)+5));
+	sprintf(row_file_name,"%s%d%s",row_prefix,i,row_sufix);
+	setRowWithSparseVectorDouble(matrix, i-i0, length ,row_file_name); // MEMORY PROBLEM HERE! : if commented the memory size is stable!!!
+	reduceRhs(values, matrix,i-i0,length,profile);
+	free(row_file_name);
+      } 
 }
-
-int get_n_pTasks(int p, int rank, int n_blocks){
-    // diagonal block distribution over all the process
-    int remainBlocks = n_blocks%p;
-    int n_pTasks = n_blocks/p;
-    if (rank<remainBlocks) n_pTasks+=1;
-    return n_pTasks;
-}
-
-int get_n_blockTasks(int r, int n_blocks){
-   // tasks distribution over all the diagonal blocks
-    int remainTasks=mpi_get_total_blocks(n_blocks)%n_blocks;
-    int nTasks = mpi_get_total_blocks(n_blocks)/n_blocks;
-    if (r<remainTasks) nTasks+=1;
-    return nTasks;
-}
-
 

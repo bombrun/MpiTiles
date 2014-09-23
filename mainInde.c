@@ -7,20 +7,6 @@
 #include "mpiutil.h"
 
 
-/**
- * return the total number of diagonal block
- * if not specify return p
- */
-int get_n_blocks(int argc, char **argv, int p);
-
-/**
- *  diagonal block distribution over all the process
- */
-int get_n_pTasks(int p, int rank, int n_blocks);
-/**
- *  tasks distribution over all the diagonal blocks
- */
-int get_n_blockTasks(int i_block, int n_blocks);
 
 /**
  * NOT WORKING
@@ -102,13 +88,6 @@ int main(int argc, char **argv) {
     //profileG_length  = setMatrixNormal(G_location,profileG,matrixG);
     
     printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
-
-// Memory test
-//     i0=mpi_get_i0(profileG_length,0,n_blocks);
-//     i1=mpi_get_i1(profileG_length,0,n_blocks);
-//     matrixCGABi = calloc(2*(i1-i0)*profileAB_length,sizeof(double));
-//    matrixCGABj = calloc(2*(i1-i0)*profileAB_length,sizeof(double));
-//     matrixCor = calloc(4*(i1-i0)*(i1-i0),sizeof(double));
      
    for(t=0;t<n_pTasks;t++){
       i_block = (rank+t*p); // the diagonal block index depends on the rank index and the task index
@@ -154,39 +133,6 @@ int main(int argc, char **argv) {
     }
     MPI_Finalize(); // the process are independent no blocking
     return ierr;
-}
-
-int get_n_blocks(int argc, char **argv, int p){
-  int n_blocks;
-  if (argc == 2) {
-      //const char* prog_name = *argv++;
-      //const char* nblocks_char = *argv;
-      n_blocks= (int) strtol(argv[1], NULL, 10);
-       if(n_blocks<p) {
-	printf("Configuration error: n_blocks %i is smaller than the number of process %d, set to default (the number of process)\n",n_blocks,p);
-	n_blocks = p; 
-      }
-    }
-    else {
-      n_blocks = p; // one diagonal block per process
-    }
-    return n_blocks;
-}
-
-int get_n_pTasks(int p, int rank, int n_blocks){
-    // diagonal block distribution over all the process
-    int remainBlocks = n_blocks%p;
-    int n_pTasks = n_blocks/p;
-    if (rank<remainBlocks) n_pTasks+=1;
-    return n_pTasks;
-}
-
-int get_n_blockTasks(int r, int n_blocks){
-   // tasks distribution over all the diagonal blocks
-    int remainTasks=mpi_get_total_blocks(n_blocks)%n_blocks;
-    int nTasks = mpi_get_total_blocks(n_blocks)/n_blocks;
-    if (r<remainTasks) nTasks+=1;
-    return nTasks;
 }
 
 int setMatrixNormal(const char* location,int* profile, double* values){
