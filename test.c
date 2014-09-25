@@ -189,6 +189,13 @@ int main(int argc, char **argv) {
       MPI_Barrier(MPI_COMM_WORLD); // do not start new tasks while there are running tasks
     }
     if(test==0) printf("%d/%d: all tests are successful\n",rank,p);
+    
+    fclose(store);//closeStore(store);
+    readStore(&store,rank,"./data/ReducedNormalsTest");
+    int dim[4];
+    readNextBlockDimension(dim,&store);
+    printf("read %d,%d,%d,%d \n",dim[0],dim[1],dim[2],dim[3]);
+    
     MPI_Finalize();
     return ierr;
 }
