@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
     const char* referenceMatrix_file_name = "./data/reducedNormalMatrix.txt"; 
     double* referenceMatrix = NULL;
     
-    const char* reducedNormalMatrix_file_name = "./data/ReducedBlockMatrixGTest";
+    const char* reducedNormalMatrix_location = "./data/ReducedNormalsTest";
     
     int i, r; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
     n_diag_blocks = p; // one diagonal block per process
     i_diag_block = rank; // the diagonal block index equals rank index
     printf("%d/%d: test, started, process diagonal block %d/%d\n",rank,p,i_diag_block,n_diag_blocks);
-    openStore(&store,rank,"./data/ReducedNormalsTest");
+    openStore(&store,rank,reducedNormalMatrix_location);
     profileAB_length = getNumberOfLine(profileAB_file_name);
     profileAB = malloc( sizeof(int) * profileAB_length );
     readMatrixInt(profileAB,profileAB_file_name);
@@ -190,12 +190,7 @@ int main(int argc, char **argv) {
     }
     if(test==0) printf("%d/%d: all tests are successful\n",rank,p);
     
-    fclose(store);//closeStore(store);
-    readStore(&store,rank,"./data/ReducedNormalsTest");
-    int dim[4];
-    readNextBlockDimension(dim,&store);
-    printf("read %d,%d,%d,%d \n",dim[0],dim[1],dim[2],dim[3]);
-    
+    fclose(store);  
     MPI_Finalize();
     return ierr;
 }

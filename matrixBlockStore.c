@@ -61,8 +61,9 @@ void readNextBlock(int i0, int i1, int j0, int j1, double * mat, FILE* store){
 
     int size = (i1-i0)*(j1-j0);
     for(i = 0; i<size ; i++) {
-	read = getline(&line, &len, store);
-	mat[i] = atof(line);
+	if ( (read = getline(&line, &len, store)) != -1) {
+	  mat[i] = atof(line);
+	}
     }
     free(line);
 }  
@@ -73,7 +74,6 @@ void readNextBlock(int i0, int i1, int j0, int j1, double * mat, FILE* store){
  * set dim
  */
 int readNextBlockDimension(int* dim, FILE* store){
-    int test;
     char * line= NULL;
     char * ptr = NULL;
     size_t len = 0;
