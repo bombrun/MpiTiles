@@ -129,7 +129,7 @@ int main(int argc, char **argv) {
 	   free(matrixCor);
 	   free(matrixCGABj); 
       }
-      closeStore(&store);
+      close(store);
       free(matrixCGABi); 
     }
     MPI_Finalize(); // the process are independent no blocking

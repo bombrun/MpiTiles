@@ -1,6 +1,6 @@
 CC=icc
-CFLAGS="-Wall -O2 -xHost -mkl"
-LDFLAGS="-lmpi -mkl"
+CFLAGS=-Wall -O2 -xHost -mkl
+LDFLAGS=-lmpi -mkl
 
 debug:clean
 	$(CC) $(CFLAGS) -g -o bigmatrix.mpi main.c mpiutil.c normals.c $(LDFLAGS)
