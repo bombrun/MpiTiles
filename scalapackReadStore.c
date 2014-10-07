@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     
     int mype,npe; // rank and total number of process
     int idescal[11]; // matrix descriptors
-    double *al; // matrix values: al is the local array
+    double *la; // matrix values: al is the local array
    
     int ierr; // error output 
     int mp_ret, np_ret, myrow, mycol; // to store grid info
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
   
 
     // allocate local matrix
-    al=malloc(sizeof(double)*mla*nla);
+    la=malloc(sizeof(double)*mla*nla);
     
     for(i_block=0;i_block<n_blocks;i_block++){
       readStore(&store,i_block,store_location);
@@ -180,7 +180,7 @@ int main(int argc, char **argv) {
                   ii = i%mb + (int)(ll)*mb;
                   jj = j%nb + (int)(mm)*nb;
                   index=jj*mla+ii;   // seems to be the transpose !?
-                  la[index] = matA[i*n+j];
+                  la[index] = mat[(i-dim[0])*MB+(j-dim[2])];
               }
 	  }
 	}
@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
                   ii = j%mb + (int)(ll)*mb;
                   jj = i%nb + (int)(mm)*nb;
                   index=jj*mla+ii;   // seems to be the transpose !?
-                  la[index] = matA[i*n+j];
+                  la[index] = mat[(i-dim[0])*MB+(j-dim[2])];
               }
 	    }
 	  } 
