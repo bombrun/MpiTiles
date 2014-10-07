@@ -228,7 +228,13 @@ int main(int argc, char **argv) {
 }
 
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int np, int mp){
+     
     
+     float ll,mm,cr,cc;
+      int ii,jj,i,j,pr,pc,h,g; // ii,jj coordinates of local array element
+      int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
+      int n_b = 1;
+      int index;
      
       
       for (i=0;i<m;i++) {
