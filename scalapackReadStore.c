@@ -36,7 +36,7 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  *  
  */
-void setLocalArray(float *matA, int m, int n, float *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
+void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
 
 
     int icon; // scalapack context
@@ -172,7 +172,7 @@ int main(int argc, char **argv) {
   
 
     // allocate local matrix
-    al=(float*)malloc(sizeof(float)*mla*nla);
+    al=malloc(sizeof(double)*mla*nla);
     
     setLocalArray(matA, m, n, al, mla, nla, mb, nb, myrow, mycol, mp, np);
     
@@ -187,7 +187,7 @@ int main(int argc, char **argv) {
 
 int mod(int i, int j);
 
-void setLocalArray(float *matA, int m, int n, float *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int np, int mp){
+void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int np, int mp){
     
       float ll,mm,cr,cc;
       int ii,jj,i,j,pr,pc,h,g; // ii,jj coordinates of local array element
