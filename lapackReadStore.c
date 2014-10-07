@@ -40,7 +40,7 @@ int main(int argc, char **argv) {
     double * mat;  // local matrix block use for reading
     
     
-    long long int sizeA;
+    long long int sizeA, id;
     double * matA; // lapack matrix
     
     int t, t_block;
@@ -74,6 +74,7 @@ int main(int argc, char **argv) {
     
     sizeA = N;
     sizeA *= M;
+    printf("matrix A : %d x %d \n",N,M);
     matA = malloc(sizeA * sizeof(double));
    
     
@@ -89,14 +90,20 @@ int main(int argc, char **argv) {
 	MB = dim[3]-dim[2];
 	for(i = dim[0];i<dim[1];i++){
 	  for(j = dim[2];j<dim[3];j++){
-	      matA[i*M+j] = mat[(i-dim[0])*MB+(j-dim[2])];
+	      id = i;
+	      id *= M;
+	      id += j; // i*M+j
+	      matA[id] = mat[(i-dim[0])*MB+(j-dim[2])];
 	  }
 	}
 	// transpose
 	if(j_block != i_block){
 	  for(i = dim[0];i<dim[1];i++){
 	    for(j = dim[2];j<dim[3];j++){
-	      matA[j*M+i] = mat[(i-dim[0])*MB+(j-dim[2])];
+		id = j;
+		id *= M;
+		id += i;
+		matA[id] = mat[(i-dim[0])*MB+(j-dim[2])];
 	    }
 	  } 
 	}
