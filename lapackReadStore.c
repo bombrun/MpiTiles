@@ -76,6 +76,7 @@ int main(int argc, char **argv) {
     sizeA *= M;
     matA = malloc(sizeA * sizeof(double));
    
+    // there is a segmentation fault with matA block (0,150)
     
     for(i_block=0;i_block<n_blocks;i_block++){
       readStore(&store,i_block,store_location);
