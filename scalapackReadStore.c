@@ -67,11 +67,7 @@ int main(int argc, char **argv) {
     int i_block, j_block;
     int dim[4];
     double * mat;  // local matrix block use for reading
-    
-    
-    long long int sizeA;
-    double * matA; // lapack matrix
-    
+        
     int t, t_block;
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
@@ -97,6 +93,13 @@ int main(int argc, char **argv) {
     int  m,n; // matrix A dimensions
     
     
+     float ll,mm,cr,cc;
+      int ii,jj,i,j,pr,pc,h,g; // ii,jj coordinates of local array element
+      int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
+      int n_b = 1;
+      int index;
+    
+    
     Cblacs_pinfo( &mype, &npe );
     
      if (argc == 3) {
@@ -117,11 +120,36 @@ int main(int argc, char **argv) {
     N = getNumberOfLine(profileG_file_name); // the dimension of the matrix;
     M = N; // square matrix
     
-    sizeA = N;
-    sizeA *= M;
-    matA = malloc(sizeA * sizeof(double));
+    m=M; //mla*mp;
+    n=N; //nla*np;
    
+    np = sqrt(npe); // assume that the number of process is a square
+    mp = np; // square grid
+    
+    mla = m/mp; // assume that the matrix dimension if a multiple of the process grid dimension
+    nla = n/np;
+    
+    mb = mla/scalapack_size; // assume that the dimension of the matrix is a multiple of the number of the number of diagonal blocks
+    nb = nla/scalapack_size;
+    
+    
+
+    
+    // init CBLACS
+    Cblacs_get( -1, 0, &icon );
+    Cblacs_gridinit( &icon,"c", mp, np ); /* MP & NP = 2**x */
+    Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
+    
+      
     // there is a segmentation fault with matA block (0,150)
+    
+     // set the matrix descriptor
+    ierr=0;
+    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+  
+
+    // allocate local matrix
+    al=malloc(sizeof(double)*mla*nla);
     
     for(i_block=0;i_block<n_blocks;i_block++){
       readStore(&store,i_block,store_location);
@@ -135,14 +163,50 @@ int main(int argc, char **argv) {
 	MB = dim[3]-dim[2];
 	for(i = dim[0];i<dim[1];i++){
 	  for(j = dim[2];j<dim[3];j++){
-	      matA[i*M+j] = mat[(i-dim[0])*MB+(j-dim[2])];
+	      //matA[i*M+j] = mat[(i-dim[0])*MB+(j-dim[2])];
+	     // finding out which pe gets this i,j element
+              cr = (float)( i/mb );
+              h = rsrc+(int)(cr);
+              pr = h%np;
+              cc = (float)( j/mb );
+              g = csrc+(int)(cc);
+              pc = g%mp;
+	      // check if process should get this element
+              if (myrow == pr && mycol==pc){
+		  // ii = x + l*mb
+		  // jj = y + m*nb
+                  ll = (float)( ( i/(np*mb) ) );  // thinks seems to be mixed up does not matter as long as the matrix, the block and the grid is symmetric
+                  mm = (float)( ( j/(mp*nb) ) );
+                  ii = i%mb + (int)(ll)*mb;
+                  jj = j%nb + (int)(mm)*nb;
+                  index=jj*mla+ii;   // seems to be the transpose !?
+                  la[index] = matA[i*n+j];
+              }
 	  }
 	}
 	// transpose
 	if(j_block != i_block){
 	  for(i = dim[0];i<dim[1];i++){
 	    for(j = dim[2];j<dim[3];j++){
-	      matA[j*M+i] = mat[(i-dim[0])*MB+(j-dim[2])];
+	      //matA[j*M+i] = mat[(i-dim[0])*MB+(j-dim[2])];
+	       // finding out which pe gets this j,i element
+              cr = (float)( j/mb );
+              h = rsrc+(int)(cr);
+              pr = h%np;
+              cc = (float)( i/mb );
+              g = csrc+(int)(cc);
+              pc = g%mp;
+	      // check if process should get this element
+              if (myrow == pr && mycol==pc){
+		  // ii = x + l*mb
+		  // jj = y + m*nb
+                  ll = (float)( ( j/(np*mb) ) );  // thinks seems to be mixed up does not matter as long as the matrix, the block and the grid is symmetric
+                  mm = (float)( ( i/(mp*nb) ) );
+                  ii = j%mb + (int)(ll)*mb;
+                  jj = i%nb + (int)(mm)*nb;
+                  index=jj*mla+ii;   // seems to be the transpose !?
+                  la[index] = matA[i*n+j];
+              }
 	    }
 	  } 
 	}
@@ -155,37 +219,8 @@ int main(int argc, char **argv) {
     
     
     printf("Start eigenvalues decomposition \n");
-   
-    m=M; //mla*mp;
-    n=N; //nla*np;
-   
-    np = sqrt(npe); // assume that the number of process is a square
-    mp = np; // square grid
-    
-    mla = m/mp; // assume that the matrix dimension if a multiple of the process grid dimension
-    nla = n/np;
-    
-    mb = mla/scalapack_size; // assume that the dimension of the matrix is a multiple of the number of the number of diagonal blocks
-    nb = nla/scalapack_size;
 
-    
-    // init CBLACS
-    Cblacs_get( -1, 0, &icon );
-    Cblacs_gridinit( &icon,"c", mp, np ); /* MP & NP = 2**x */
-    Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
-    
-    // set the matrix descriptor
-    ierr=0;
-    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
-  
-
-    // allocate local matrix
-    al=malloc(sizeof(double)*mla*nla);
-    
-    //setLocalArray(matA, m, n, al, mla, nla, mb, nb, myrow, mycol, mp, np);
-    
-
-    free(matA);
+    // free(matA);
     
     free(al);
     Cblacs_exit( 0 );
@@ -194,11 +229,7 @@ int main(int argc, char **argv) {
 
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int np, int mp){
     
-      float ll,mm,cr,cc;
-      int ii,jj,i,j,pr,pc,h,g; // ii,jj coordinates of local array element
-      int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
-      int n_b = 1;
-      int index;
+     
       
       for (i=0;i<m;i++) {
       	for (j=0;j<n;j++) {
