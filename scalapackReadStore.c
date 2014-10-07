@@ -140,7 +140,7 @@ int main(int argc, char **argv) {
     
     int mype,npe; // rank and total number of process
     int idescal[11]; // matrix descriptors
-    float *al; // matrix values: al is the local array
+    double *al; // matrix values: al is the local array
    
     int ierr; // error output 
     int mp_ret, np_ret, myrow, mycol; // to store grid info
