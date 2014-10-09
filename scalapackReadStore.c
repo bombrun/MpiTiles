@@ -44,7 +44,6 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
 
 
-    int icon; // scalapack context
 
 /* Test program 
  * created 23/09/2014
@@ -94,11 +93,11 @@ int main(int argc, char **argv) {
     
     
      float ll,mm,cr,cc;
-      int ii,jj,i,j,pr,pc,h,g; // ii,jj coordinates of local array element
+      int ii,jj,pr,pc,h,g; // ii,jj coordinates of local array element
       int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
       int n_b = 1;
       int index;
-    
+    int icon; // scalapack cblacs context
     
     Cblacs_pinfo( &mype, &npe );
     
@@ -115,7 +114,7 @@ int main(int argc, char **argv) {
     
   
 
-    printf("read store\n");
+    printf("%d/%d: read store\n",mype,npe);
    
     N = getNumberOfLine(profileG_file_name); // the dimension of the matrix;
     M = N; // square matrix
@@ -137,7 +136,7 @@ int main(int argc, char **argv) {
     
     // init CBLACS
     Cblacs_get( -1, 0, &icon );
-    Cblacs_gridinit( &icon,"c", mp, np ); /* MP & NP = 2**x */
+    Cblacs_gridinit( &icon,"c", mp, np ); 
     Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
     
       
@@ -150,6 +149,7 @@ int main(int argc, char **argv) {
 
     // allocate local matrix
     la=malloc(sizeof(double)*mla*nla);
+    printf("%d/%d: full matrix (%d,%d), local matrix (%d,%d), processor grid (%d,%d), block (%d,%d) \n", mype, npe, m, n, mla, nla, np, mp, mb, nb);
     
     for(i_block=0;i_block<n_blocks;i_block++){
       readStore(&store,i_block,store_location);
@@ -158,7 +158,8 @@ int main(int argc, char **argv) {
 	j_block = mpi_get_diag_block_id(i_block, t_block, n_blocks);
 	mat = malloc((dim[1]-dim[0])*(dim[3]-dim[2]) * sizeof(double));         
 	readNextBlock(dim[0],dim[1],dim[2],dim[3],mat,store);
-	printf("read block (%d,%d) with global indices (%d,%d,%d,%d) \n",i_block,j_block,dim[0],dim[1],dim[2],dim[3]);
+	printf("%d/%d: read block (%d,%d) with global indices (%d,%d,%d,%d) \n",mype, npe, i_block,j_block,dim[0],dim[1],dim[2],dim[3]);
+	
 	NB = dim[1]-dim[0];
 	MB = dim[3]-dim[2];
 	for(i = dim[0];i<dim[1];i++){
@@ -180,6 +181,8 @@ int main(int argc, char **argv) {
                   ii = i%mb + (int)(ll)*mb;
                   jj = j%nb + (int)(mm)*nb;
                   index=jj*mla+ii;   // seems to be the transpose !?
+		  //if(index<0) printf("%d/%d: negative index (%d,%d) \n",mype,npe,i,j);
+		  //if(index>=mla*nla) printf("%d/%d: too large index (%d,%d) \n",mype,npe,i,j);
                   la[index] = mat[(i-dim[0])*MB+(j-dim[2])];
               }
 	  }
@@ -205,6 +208,9 @@ int main(int argc, char **argv) {
                   ii = j%mb + (int)(ll)*mb;
                   jj = i%nb + (int)(mm)*nb;
                   index=jj*mla+ii;   // seems to be the transpose !?
+		  //if(index<0) printf("%d/%d: negative index (%d,%d) \n",mype,npe,i,j);
+		  //if(index>=mla*nla) printf("%d/%d: too large index (%d,%d) \n",mype,npe,i,j);
+
                   la[index] = mat[(i-dim[0])*MB+(j-dim[2])];
               }
 	    }
@@ -218,11 +224,12 @@ int main(int argc, char **argv) {
     }
     
     
-    printf("Start eigenvalues decomposition \n");
+    printf("%d/%d: finished \n",mype,npe);
 
     // free(matA);
     
-    free(al);
+    free(la);
+    Cblacs_gridexit(icon);
     Cblacs_exit( 0 );
     return 0;
 }
