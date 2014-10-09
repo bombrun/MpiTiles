@@ -90,8 +90,13 @@ int main(int argc, char **argv) {
     int one=1; // value used for the descriptor initialization
     
     int  m,n; // matrix A dimensions
-    
-    
+    double norm, cond;
+    double *work = NULL;
+    double * work2 = NULL;
+    int *iwork = NULL;
+    int lwork, liwork;
+
+
      float ll,mm,cr,cc;
       int ii,jj,pr,pc,h,g; // ii,jj coordinates of local array element
       int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
@@ -152,13 +157,14 @@ int main(int argc, char **argv) {
     printf("%d/%d: full matrix (%d,%d), local matrix (%d,%d), processor grid (%d,%d), block (%d,%d) \n", mype, npe, m, n, mla, nla, np, mp, mb, nb);
     
     for(i_block=0;i_block<n_blocks;i_block++){
+      printf("%d/%d: process store block %d \n", mype, npe, i_block);
       readStore(&store,i_block,store_location);
       t_block = 0;
       while(readNextBlockDimension(dim,store)!=-1) { // loop B over all block tasks
 	j_block = mpi_get_diag_block_id(i_block, t_block, n_blocks);
 	mat = malloc((dim[1]-dim[0])*(dim[3]-dim[2]) * sizeof(double));         
 	readNextBlock(dim[0],dim[1],dim[2],dim[3],mat,store);
-	printf("%d/%d: read block (%d,%d) with global indices (%d,%d,%d,%d) \n",mype, npe, i_block,j_block,dim[0],dim[1],dim[2],dim[3]);
+//	printf("%d/%d: read block (%d,%d) with global indices (%d,%d,%d,%d) \n",mype, npe, i_block,j_block,dim[0],dim[1],dim[2],dim[3]);
 	
 	NB = dim[1]-dim[0];
 	MB = dim[3]-dim[2];
@@ -224,10 +230,28 @@ int main(int argc, char **argv) {
     }
     
     
-    printf("%d/%d: finished \n",mype,npe);
-
-    // free(matA);
+    printf("%d/%d: finished scaterring the matrix \n",mype,npe);
     
+    printf("%d/%d: start computing \n",mype,npe);
+    ierr = 0;
+    work = malloc(sizeof(double)*(2*mla+2*nla));
+    norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
+    printf("%d/%d: norm %f \n",mype,npe,norm);
+    free(work);
+
+    ierr = 0;
+    pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
+
+    lwork = 2*mla+3*nla;
+    work2 = malloc(sizeof(double)*lwork);
+    liwork = 2*mla;
+    iwork = malloc(sizeof(int)*liwork);
+    pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
+    printf("%d/%d: condition number %f \n",mype,npe,cond);
+
+
+    printf("%d/%d: finished computing \n",mype,npe);
+
     free(la);
     Cblacs_gridexit(icon);
     Cblacs_exit( 0 );
