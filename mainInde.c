@@ -8,7 +8,7 @@
 #include "matrixBlockStore.h"
 
 /**
- * NOT WORKING
+ * this function is NOT WORKING
  */
 int setMatrixNormal(const char* location,int** profile, double** values);
 
@@ -17,6 +17,8 @@ int setMatrixNormal(const char* location,int** profile, double** values);
   created 7/09/2014
   author Alex Bombrun
   see TN APB-009
+  
+  mpirun -n 4 bigmatrix.mpi 4
  */
 int main(int argc, char **argv) {
   
@@ -134,7 +136,7 @@ int main(int argc, char **argv) {
 	  //MPI_Barrier(MPI_COMM_WORLD); // to prevent memory acess to the same file -> useless does not improve things
 
       }
-      closeStore(&store);
+      fclose(store);
       free(matrixCGABi); 
     }
     MPI_Finalize(); // the process are independent no blocking
