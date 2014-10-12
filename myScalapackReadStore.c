@@ -5,11 +5,12 @@
 #include "normals.h"
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
+
 #include "matrixScalapackStore.h"
 
-#include <mkl_cblas.h>
-#include <mkl_blas.h>
-#include <mkl_scalapack.h>
+//#include <cblas.h>
+//#include <blas.h>
+//#include <scalapack.h>
 
 
 extern void   Cblacs_pinfo( int* mypnum, int* nprocs);
@@ -21,14 +22,13 @@ extern void   Cblacs_exit( int error_code);
 extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row, int np_col);
 
 
-//void pdpocon (char *uplo , MKL_INT *n , double *a , MKL_INT *ia , MKL_INT *ja , MKL_INT *desca , double *anorm , double *rcond , double *work , MKL_INT *lwork , MKL_INT *iwork , MKL_INT *liwork , MKL_INT *info );
 
 /**
     input c
     assume c = n*n;
     return n
     */
-int sqrt(int c);
+int isqrt(int c);
 int saveMatrix(long long int dim, double * mat, const char* fileName);
 
 
@@ -37,14 +37,20 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * mb x nb are the block dimensions
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
- * Compile on share memory
- * module load scalapack 
- * icc -O1 -o eigen.exe -I/sw/global/compilers/intel/2013/mkl/include scalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -lmpi -mkl -lmkl_scalapack_lp64 -lmkl_blacs_sgimpt_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core 
+ * Compile on linux with scalapack and openmpi 
  * 
- * bsub -Is -n 16 mpirun -np 16 ./eigen.exe 100 1
+ * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -L/opt/scalapack/lib/libscalapack.a -l:/opt/scalapack/lib/libscalapack.a -L:/opt/scalapack/lib/
+ * 
+ * run with
+ * mpirun -n 4 eigen.exe 100 4
+ * 
+ * assume that 
+ * mpirun -n 4 bigmatrix.mpi 100
+ * was run successfully
  */
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
 
+//void descinit_(int * idescal, int* m, int *n  , int * mb, int *nb , int *ze, int *ze, int *icon, int * mla, int *ierr);
 
 
 /* Test program 
@@ -58,6 +64,7 @@ void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int 
 int main(int argc, char **argv) {
   
     FILE* store;
+    FILE* scaStore;
     
     int N , M;
     int i, j;
@@ -73,6 +80,7 @@ int main(int argc, char **argv) {
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* store_location = "./data/ReducedNormals";
+    const char* scaStore_location =".data/CholeskyReducedNormals";
     
     int mp;	 // number of rows in the processor grid
     int mla;   // number of rows in the local array
@@ -95,8 +103,8 @@ int main(int argc, char **argv) {
     double norm, cond;
     double *work = NULL;
     double * work2 = NULL;
-    MKL_INT *iwork = NULL;
-    MKL_INT  lwork, liwork;
+    int *iwork = NULL;
+    int lwork, liwork;
 
 
      float ll,mm,cr,cc;
@@ -129,7 +137,7 @@ int main(int argc, char **argv) {
     m=M; //mla*mp;
     n=N; //nla*np;
    
-    np = sqrt(npe); // assume that the number of process is a square
+    np = isqrt(npe); // assume that the number of process is a square
     mp = np; // square grid
     
     mla = m/mp; // assume that the matrix dimension if a multiple of the process grid dimension
@@ -151,7 +159,7 @@ int main(int argc, char **argv) {
     
      // set the matrix descriptor
     ierr=0;
-    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+//    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
   
 
     // allocate local matrix
@@ -237,31 +245,27 @@ int main(int argc, char **argv) {
     printf("%d/%d: start computing \n",mype,npe);
     ierr = 0;
     work = malloc(sizeof(double)*(2*mla+2*nla));
-    norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
+//  norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
     printf("%d/%d: norm %f \n",mype,npe,norm);
     free(work);
 
     ierr = 0;
-    pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
-    
-      
+//  pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
+
+
+    printf("%d/%d: finished computing cholesky factor\n",mype,npe);
     openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
     saveLocalMatrix(la,nla,mla,scaStore);
-    printf("%d/%d: finished computing cholesky factor\n",mype,npe);
-    
-   
-    
+
+
     lwork = 2*mla+3*nla;
     work2 = malloc(sizeof(double)*lwork);
-    liwork = 2*mla; // mla should be sufficient
-    iwork = malloc(sizeof(MKL_INT)*liwork);
-    // PARAM 10 : iwork is wrong
-    // DOES NOT WORK ? pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
+    liwork = 2*mla;
+    iwork = malloc(sizeof(int)*liwork);
+//  pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
     printf("%d/%d: condition number %f \n",mype,npe,cond);
 
-
-    printf("%d/%d: finished computing \n",mype,npe);
-
+    
     free(la);
     Cblacs_gridexit(icon);
     Cblacs_exit( 0 );
@@ -325,7 +329,7 @@ int saveMatrix(long long int dim, double * mat, const char* fileName) {
     assume c = n*n;
     return n
     */
-int sqrt(int c)
+int isqrt(int c)
 {
     int n = 0;
     while( n*n < c)
