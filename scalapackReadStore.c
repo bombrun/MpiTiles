@@ -5,6 +5,7 @@
 #include "normals.h"
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
+#include "matrixScalapackStore.h"
 
 #include <mkl_cblas.h>
 #include <mkl_blas.h>
@@ -20,6 +21,7 @@ extern void   Cblacs_exit( int error_code);
 extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row, int np_col);
 
 
+//void pdpocon (char *uplo , MKL_INT *n , double *a , MKL_INT *ia , MKL_INT *ja , MKL_INT *desca , double *anorm , double *rcond , double *work , MKL_INT *lwork , MKL_INT *iwork , MKL_INT *liwork , MKL_INT *info );
 
 /**
     input c
@@ -37,7 +39,7 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * 
  * Compile on share memory
  * module load scalapack 
- * icc -O1 -o eigen.exe -I/sw/global/compilers/intel/2013/mkl/include scalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -lmpi -mkl -lmkl_scalapack_lp64 -lmkl_blacs_sgimpt_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core 
+ * icc -O1 -o eigen.exe -I/sw/global/compilers/intel/2013/mkl/include scalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -lmpi -mkl -lmkl_scalapack_lp64 -lmkl_blacs_sgimpt_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core 
  * 
  * bsub -Is -n 16 mpirun -np 16 ./eigen.exe 100 1
  */
@@ -93,8 +95,8 @@ int main(int argc, char **argv) {
     double norm, cond;
     double *work = NULL;
     double * work2 = NULL;
-    int *iwork = NULL;
-    int lwork, liwork;
+    MKL_INT *iwork = NULL;
+    MKL_INT  lwork, liwork;
 
 
      float ll,mm,cr,cc;
@@ -244,8 +246,9 @@ int main(int argc, char **argv) {
 
     lwork = 2*mla+3*nla;
     work2 = malloc(sizeof(double)*lwork);
-    liwork = 2*mla;
-    iwork = malloc(sizeof(int)*liwork);
+    liwork = 2*mla; // mla should be sufficient
+    iwork = malloc(sizeof(MKL_INT)*liwork);
+    // PARAM 10 : iwork is wrong
     pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
     printf("%d/%d: condition number %f \n",mype,npe,cond);
 

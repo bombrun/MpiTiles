@@ -1,34 +1,24 @@
-CC=mpicc
-CFLAGS="-Wall"
+CC=icc
+CFLAGS=-Wall -O2 -xHost -mkl
+LDFLAGS=-lmpi -mkl
 
-ICC=icc
-
-MKLCFLAGS="-Wall -g -O2 -xHost -mkl"
-MKLLDFLAGS="-lmpi -mkl"
-
-
-
-  
 debug:clean
-	$(CC) $(CFLAGS) -g -o bigmatrix.mpi main.c mpiutil.c normals.c matrixBlockStore.c
-	
+	$(CC) $(CFLAGS) -g -o bigmatrix.mpi main.c mpiutil.c normals.c matrixBlockStore.c $(LDFLAGS)
+
 stable:clean
-	$(CC) $(CFLAGS)    -o bigmatrix.mpi main.c mpiutil.c normals.c matrixBlockStore.c
-	
+	$(CC) $(CFLAGS)    -o bigmatrix.mpi main.c mpiutil.c normals.c matrixBlockStore.c  $(LDFLAGS)
+
 inde:clean
-	$(CC) $(CFLAGS)    -o bigmatrix.mpi mainInde.c mpiutil.c normals.c matrixBlockStore.c
+	$(CC) $(CFLAGS)    -o bigmatrix.mpi mainInde.c mpiutil.c normals.c matrixBlockStore.c $(LDFLAGS)
 	
 mkl:clean
-	$(ICC) $(MKLCFLAGS) -o bigmatrix.mpi  mainMkl.c mpiutil.c normals.c matrixBlockStore.c $(MKLLDFLAGS)
-	
+	$(CC) $(CFLAGS) -o bigmatrix.mpi  mainMkl.c mpiutil.c normals.c matrixBlockStore.c  $(LDFLAGS)
+
 eigen:
-	$(ICC) -O2 -o eigen.exe lapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -mkl
-	
+	$(CC) -O2 -o eigen.exe lapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -mkl
+
 test:clean
-	$(CC) $(CFLAGS) -g -o bigmatrix.mpi test.c mpiutil.c normals.c matrixBlockStore.c
-	
+	$(CC) $(CFLAGS) -g -o bigmatrix.mpi test.c mpiutil.c normals.c matrixBlockStore.c $(LDFLAGS)
+
 clean:
-	rm -vfr *~ 
-	
-cleanAll:
-	rm -vrf *~ *.mpi *.exe *.txt
+	rm -vfr *~ bigmatrix
