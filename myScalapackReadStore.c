@@ -6,11 +6,12 @@
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
 
-/*
-#include <mkl_cblas.h>
-#include <mkl_blas.h>
-#include <mkl_scalapack.h>
-*/
+#include "matrixScalapackStore.h"
+
+//#include <cblas.h>
+//#include <blas.h>
+//#include <scalapack.h>
+
 
 extern void   Cblacs_pinfo( int* mypnum, int* nprocs);
 extern void   Cblacs_get( int context, int request, int* value);
@@ -36,14 +37,20 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * mb x nb are the block dimensions
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
- * Compile on share memory
- * module load scalapack 
- * icc -O1 -o eigen.exe -I/sw/global/compilers/intel/2013/mkl/include scalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -lmpi -mkl -lmkl_scalapack_lp64 -lmkl_blacs_sgimpt_lp64 -lmkl_intel_lp64 -lmkl_sequential -lmkl_core 
+ * Compile on linux with scalapack and openmpi 
  * 
- * bsub -Is -n 16 mpirun -np 16 ./eigen.exe 100 1
+ * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -L/opt/scalapack/lib/libscalapack.a -l:/opt/scalapack/lib/libscalapack.a -L:/opt/scalapack/lib/
+ * 
+ * run with
+ * mpirun -n 4 eigen.exe 100 4
+ * 
+ * assume that 
+ * mpirun -n 4 bigmatrix.mpi 100
+ * was run successfully
  */
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
 
+//void descinit_(int * idescal, int* m, int *n  , int * mb, int *nb , int *ze, int *ze, int *icon, int * mla, int *ierr);
 
 
 /* Test program 
@@ -57,6 +64,7 @@ void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int 
 int main(int argc, char **argv) {
   
     FILE* store;
+    FILE* scaStore;
     
     int N , M;
     int i, j;
@@ -72,6 +80,7 @@ int main(int argc, char **argv) {
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* store_location = "./data/ReducedNormals";
+    const char* scaStore_location =".data/CholeskyReducedNormals";
     
     int mp;	 // number of rows in the processor grid
     int mla;   // number of rows in the local array
@@ -150,7 +159,7 @@ int main(int argc, char **argv) {
     
      // set the matrix descriptor
     ierr=0;
-//  descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+//    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
   
 
     // allocate local matrix
@@ -243,6 +252,12 @@ int main(int argc, char **argv) {
     ierr = 0;
 //  pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
 
+
+    printf("%d/%d: finished computing cholesky factor\n",mype,npe);
+    openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
+    saveLocalMatrix(la,nla,mla,scaStore);
+
+
     lwork = 2*mla+3*nla;
     work2 = malloc(sizeof(double)*lwork);
     liwork = 2*mla;
@@ -250,9 +265,7 @@ int main(int argc, char **argv) {
 //  pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
     printf("%d/%d: condition number %f \n",mype,npe,cond);
 
-
-    printf("%d/%d: finished computing \n",mype,npe);
-
+    
     free(la);
     Cblacs_gridexit(icon);
     Cblacs_exit( 0 );

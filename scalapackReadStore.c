@@ -241,12 +241,19 @@ int main(int argc, char **argv) {
 
     ierr = 0;
     pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
-
+    
+      
+    openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
+    saveLocalMatrix(la,nla,mla,scaStore);
+    printf("%d/%d: finished computing cholesky factor\n",mype,npe);
+    
+   
+    
     lwork = 2*mla+3*nla;
     work2 = malloc(sizeof(double)*lwork);
     liwork = 2*mla;
     iwork = malloc(sizeof(int)*liwork);
-    pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
+    // DOES NOT WORK ? pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
     printf("%d/%d: condition number %f \n",mype,npe,cond);
 
 
