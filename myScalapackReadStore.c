@@ -8,11 +8,6 @@
 
 #include "matrixScalapackStore.h"
 
-//#include <cblas.h>
-//#include <blas.h>
-//#include <scalapack.h>
-
-
 extern void   Cblacs_pinfo( int* mypnum, int* nprocs);
 extern void   Cblacs_get( int context, int request, int* value);
 extern int    Cblacs_gridinit( int* context, char * order, int np_row, int np_col);
@@ -38,14 +33,12 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
  * Compile on linux with scalapack and openmpi 
- * 
- * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -L/opt/scalapack/lib/libscalapack.a -l:/opt/scalapack/lib/libscalapack.a -L:/opt/scalapack/lib/
- * 
+ * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran
  * run with
- * mpirun -n 4 eigen.exe 100 4
+ * mpirun -n 4 eigen.exe 4 4
  * 
  * assume that 
- * mpirun -n 4 bigmatrix.mpi 100
+ * mpirun -n 4 bigmatrix.mpi 4
  * was run successfully
  */
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
@@ -80,7 +73,7 @@ int main(int argc, char **argv) {
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* store_location = "./data/ReducedNormals";
-    const char* scaStore_location =".data/CholeskyReducedNormals";
+    const char* scaStore_location ="./data/CholeskyReducedNormals";
     
     int mp;	 // number of rows in the processor grid
     int mla;   // number of rows in the local array
@@ -263,7 +256,7 @@ int main(int argc, char **argv) {
     liwork = 2*mla;
     iwork = malloc(sizeof(int)*liwork);
 //  pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
-    printf("%d/%d: condition number %f \n",mype,npe,cond);
+//  printf("%d/%d: condition number %f \n",mype,npe,cond);
 
     
     free(la);
