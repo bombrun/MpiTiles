@@ -16,7 +16,7 @@ extern void   Cblacs_gridexit( int context);
 extern void   Cblacs_exit( int error_code);
 extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row, int np_col);
 
-
+extern void pdsyev_( char *jobz, char *uplo, int *n, double *a, int *ia, int *ja, int *desca, double *w, double *z, int *iz, int *jz, int *descz, double *work, int *lwork, int *info );
 
 /**
     input c
@@ -26,6 +26,12 @@ extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row
 int isqrt(int c);
 int saveMatrix(long long int dim, double * mat, const char* fileName);
 
+static int max( int a, int b ){
+        if (a>b) return(a); else return(b);
+}
+static int min( int a, int b ){
+        if (a<b) return(a); else return(b);
+}
 
 /**
  * set the local array store in la with dimenstions mla x nla with the values of matA woth dimenstion m x n
@@ -83,8 +89,14 @@ int main(int argc, char **argv) {
     int nb;    // number of columns in a block
     
     int mype,npe; // rank and total number of process
+    
     int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
+    
+    int idesczl[9]; // matrix descriptors
+    double *lz; // matrix values: al is the local array
+    
+    double *w;
    
     int ierr; // error output 
     int mp_ret, np_ret, myrow, mycol; // to store grid info
@@ -106,7 +118,11 @@ int main(int argc, char **argv) {
       int n_b = 1;
       int index;
     int icon; // scalapack cblacs context
+    char job, jobz, uplo;
     
+    double MPIt1, MPIt2, MPIelapsed;
+    
+    jobz= 'N'; uplo='U';
     Cblacs_pinfo( &mype, &npe );
     
      if (argc == 3) {
@@ -139,21 +155,12 @@ int main(int argc, char **argv) {
     mb = mla/scalapack_size; // assume that the dimension of the matrix is a multiple of the number of the number of diagonal blocks
     nb = nla/scalapack_size;
     
-    
-
-    
     // init CBLACS
     Cblacs_get( -1, 0, &icon );
     Cblacs_gridinit( &icon,"c", mp, np ); 
     Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
     
-      
-    // there is a segmentation fault with matA block (0,150)
-    
-     // set the matrix descriptor
-    ierr=0;
-    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
-    if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
+   
 
     // allocate local matrix
     la=malloc(sizeof(double)*mla*nla);
@@ -236,28 +243,63 @@ int main(int argc, char **argv) {
     printf("%d/%d: finished scaterring the matrix \n",mype,npe);
     
     printf("%d/%d: start computing \n",mype,npe);
+       // set the matrix descriptor
+    ierr=0;
+    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
+    
     ierr = 0;
-    work = malloc(sizeof(double)*(2*mla+2*nla));
-    norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
+    // compute norm 1 of the reduced normal matrix
+    /*
+    lwork = 2*mla+2*nla;
+    work = malloc(sizeof(double)*lwork);
+    job = '1';
+    norm = pdlansy_(&job, &uplo, &n, la, &one, &one, idescal, work); 
     printf("%d/%d: norm %f \n",mype,npe,norm);
     free(work);
-
+    */
+    
     ierr = 0;
-    pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
-
-
+    // compute the cholesky decomposition 
+    /*  
+    pdpotrf_(&uplo,&n,la,&one,&one,idescal,&ierr);
     printf("%d/%d: finished computing cholesky factor\n",mype,npe);
     openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
     saveLocalMatrix(la,nla,mla,scaStore);
+    */
+    
+    ierr = 0;
+    // compute the eigen values
+    jobz= 'N'; uplo='U'; // with N z is ignored
+    descinit_(idesczl, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    lz = malloc(sizeof(double)*mla*nla);
+    w = malloc(sizeof(double)*m);
+    lwork = -1;
+    work = malloc(sizeof(double)*2);
+    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // only compute lwork
+    //pdsyev_( &jobz, &uplo, &n, A, &ione, &ione, descA, W, Z, &ione, &ione, descZ, work, &lwork, &info );
+    lwork= (int) work[0];
+    free(work);
+    work = (double *)calloc(lwork,sizeof(double)) ;
+    MPIt1 = MPI_Wtime();
+    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // only compute lwork
+    MPIt2 = MPI_Wtime();
+    MPIelapsed=MPIt2-MPIt1;
+    
+    if (mype == 0) {
+	saveMatrix(n,w,"eigenvalues.txt");
+    }
 
-
+    ierr = 0;
+    // compute the conditioner number assume that the norm and the cholesky decomposition have been computed
+    /*
     lwork = 2*mla+3*nla;
     work2 = malloc(sizeof(double)*lwork);
     liwork = 2*mla;
     iwork = malloc(sizeof(int)*liwork);
-//  pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
-//  printf("%d/%d: condition number %f \n",mype,npe,cond);
-
+    pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
+    printf("%d/%d: condition number %f \n",mype,npe,cond);
+    */
     
     free(la);
     Cblacs_gridexit(icon);
