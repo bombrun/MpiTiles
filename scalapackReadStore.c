@@ -21,6 +21,9 @@ extern void   Cblacs_exit( int error_code);
 extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row, int np_col);
 
 
+extern void pdsyev_( char *jobz, char *uplo, int *n, double *a, int *ia, int *ja, int *desca, double *w, double *z, int *iz, int *jz, int *descz, double *work, int *lwork, int *info );
+
+
 //void pdpocon (char *uplo , MKL_INT *n , double *a , MKL_INT *ia , MKL_INT *ja , MKL_INT *desca , double *anorm , double *rcond , double *work , MKL_INT *lwork , MKL_INT *iwork , MKL_INT *liwork , MKL_INT *info );
 
 /**
@@ -28,7 +31,7 @@ extern void   Cblacs_gridmap( int* context, int* map, int ld_usermap, int np_row
     assume c = n*n;
     return n
     */
-int sqrt(int c);
+int isqrt(int c);
 int saveMatrix(long long int dim, double * mat, const char* fileName);
 
 
@@ -82,8 +85,16 @@ int main(int argc, char **argv) {
     int nb;    // number of columns in a block
     
     int mype,npe; // rank and total number of process
-    int idescal[11]; // matrix descriptors
+    
+    int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
+    
+    int idesczl[9]; // matrix descriptors
+    double *lz; // matrix values: al is the local array
+    
+    double *w;
+   
+    
    
     int ierr; // error output 
     int mp_ret, np_ret, myrow, mycol; // to store grid info
@@ -95,8 +106,8 @@ int main(int argc, char **argv) {
     double norm, cond;
     double *work = NULL;
     double * work2 = NULL;
-    MKL_INT *iwork = NULL;
-    MKL_INT  lwork, liwork;
+    int *iwork = NULL;
+    int  lwork, liwork;
 
 
      float ll,mm,cr,cc;
@@ -105,7 +116,11 @@ int main(int argc, char **argv) {
       int n_b = 1;
       int index;
     int icon; // scalapack cblacs context
+    char job, jobz, uplo;
     
+    double MPIt1, MPIt2, MPIelapsed;
+    
+    jobz= 'N'; uplo='U';
     Cblacs_pinfo( &mype, &npe );
     
      if (argc == 3) {
@@ -236,28 +251,48 @@ int main(int argc, char **argv) {
     
     printf("%d/%d: start computing \n",mype,npe);
     ierr = 0;
-    work = malloc(sizeof(double)*(2*mla+2*nla));
-    norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
+    // compute norm 1 of the reduced normal matrix
+    /*
+    lwork = 2*mla+2*nla;
+    work = malloc(sizeof(double)*lwork);
+    job = '1';
+    norm = pdlansy_(&job, &uplo, &n, la, &one, &one, idescal, work); 
     printf("%d/%d: norm %f \n",mype,npe,norm);
     free(work);
+    */
 
     ierr = 0;
+    // compute the cholesky decomposition 
+    /*  
     pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
-    
-      
     openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
     saveLocalMatrix(la,nla,mla,scaStore);
     printf("%d/%d: finished computing cholesky factor\n",mype,npe);
-    
+    */
    
     
-    lwork = 2*mla+3*nla;
-    work2 = malloc(sizeof(double)*lwork);
-    liwork = 2*mla; // mla should be sufficient
-    iwork = malloc(sizeof(MKL_INT)*liwork);
-    // PARAM 10 : iwork is wrong
-    // DOES NOT WORK ? pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
-    //printf("%d/%d: condition number %f \n",mype,npe,cond);
+    ierr = 0;
+    // compute the eigen values
+    jobz= 'N'; uplo='U'; // with N z is ignored
+    descinit_(idesczl, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    lz = malloc(sizeof(double)*mla*nla);
+    w = malloc(sizeof(double)*m);
+    lwork = -1;
+    work = malloc(sizeof(double)*2);
+    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // only compute lwork
+    //pdsyev_( &jobz, &uplo, &n, A, &ione, &ione, descA, W, Z, &ione, &ione, descZ, work, &lwork, &info );
+    lwork= (int) work[0];
+    free(work);
+    work = (double *)calloc(lwork,sizeof(double)) ;
+    //MPIt1 = MPI_Wtime();
+    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // compute the eigen values
+    //MPIt2 = MPI_Wtime();
+    //MPIelapsed=MPIt2-MPIt1;
+    
+    if (mype == 0) {
+	saveMatrix(n,w,"eigenvalues.txt");
+	//printf("%d/%d: finished job in %8.2fs\n",mype,npe,MPIelapsed); // not working
+    }
 
 
     printf("%d/%d: finished computing \n",mype,npe);
@@ -326,7 +361,7 @@ int saveMatrix(long long int dim, double * mat, const char* fileName) {
     assume c = n*n;
     return n
     */
-int sqrt(int c)
+int isqrt(int c)
 {
     int n = 0;
     while( n*n < c)

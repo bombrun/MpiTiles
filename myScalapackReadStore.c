@@ -281,13 +281,14 @@ int main(int argc, char **argv) {
     lwork= (int) work[0];
     free(work);
     work = (double *)calloc(lwork,sizeof(double)) ;
-    MPIt1 = MPI_Wtime();
-    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // only compute lwork
-    MPIt2 = MPI_Wtime();
-    MPIelapsed=MPIt2-MPIt1;
+    //MPIt1 = MPI_Wtime();
+    pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // compute the eigen values
+    //MPIt2 = MPI_Wtime();
+    //MPIelapsed=MPIt2-MPIt1;
     
     if (mype == 0) {
 	saveMatrix(n,w,"eigenvalues.txt");
+	//printf("%d/%d: finished job in %8.2fs\n",mype,npe,MPIelapsed); // not working
     }
 
     ierr = 0;
