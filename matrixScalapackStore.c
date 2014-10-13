@@ -59,6 +59,7 @@ int readLocalMatrix(double* lmat,int nla, int mla, FILE* store) {
 	}
     }
     free(line);
+    return 0;
 }
 
 

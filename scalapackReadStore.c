@@ -58,7 +58,7 @@ void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int 
 int main(int argc, char **argv) {
   
     FILE* store;
-    
+    FILE* scaStore;    
     int N , M;
     int i, j;
     
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* store_location = "./data/ReducedNormals";
-    
+    const char* scaStore_location = "./data/CholeskyReducedNormals";    
     int mp;	 // number of rows in the processor grid
     int mla;   // number of rows in the local array
     int mb;    // number of rows in a block
@@ -257,10 +257,11 @@ int main(int argc, char **argv) {
     iwork = malloc(sizeof(MKL_INT)*liwork);
     // PARAM 10 : iwork is wrong
     // DOES NOT WORK ? pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
-    printf("%d/%d: condition number %f \n",mype,npe,cond);
+    //printf("%d/%d: condition number %f \n",mype,npe,cond);
 
 
     printf("%d/%d: finished computing \n",mype,npe);
+    // if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
 
     free(la);
     Cblacs_gridexit(icon);
