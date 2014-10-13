@@ -33,7 +33,7 @@ int saveMatrix(long long int dim, double * mat, const char* fileName);
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
  * Compile on linux with scalapack and openmpi 
- * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran
+ * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
  * run with
  * mpirun -n 4 eigen.exe 4 4
  * 
@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     int nb;    // number of columns in a block
     
     int mype,npe; // rank and total number of process
-    int idescal[11]; // matrix descriptors
+    int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
    
     int ierr; // error output 
@@ -152,8 +152,8 @@ int main(int argc, char **argv) {
     
      // set the matrix descriptor
     ierr=0;
-//    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
-  
+    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
 
     // allocate local matrix
     la=malloc(sizeof(double)*mla*nla);
@@ -238,12 +238,12 @@ int main(int argc, char **argv) {
     printf("%d/%d: start computing \n",mype,npe);
     ierr = 0;
     work = malloc(sizeof(double)*(2*mla+2*nla));
-//  norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
+    norm = pdlansy_("1", "L", &n, la, &one, &one, idescal, work); 
     printf("%d/%d: norm %f \n",mype,npe,norm);
     free(work);
 
     ierr = 0;
-//  pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
+    pdpotrf_("L",&n,la,&one,&one,idescal,&ierr); // compute the cholesky decomposition 
 
 
     printf("%d/%d: finished computing cholesky factor\n",mype,npe);

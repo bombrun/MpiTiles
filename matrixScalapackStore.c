@@ -74,7 +74,7 @@ void saveMatrixDescriptor(int * desc, const char* location){
     FILE* store = fopen(file_name, "w");
     free(file_name);
     int i;
-    for(i = 0; i<11 ; i++) {
+    for(i = 0; i<9 ; i++) {
         fprintf(store,"%d\n",desc[i]);
     }
     fclose(store);
@@ -88,7 +88,7 @@ void readMatrixDescriptor(int * desc, const char* location){
     char * line = NULL;
     size_t len = 0;
     ssize_t read;
-    int size = 11;
+    int size = 9;
     for(i = 0; i<size ; i++) {
 	if ( (read = getline(&line, &len, store)) != -1) {
 	  desc[i] = atoi(line);
