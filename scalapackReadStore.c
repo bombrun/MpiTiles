@@ -144,7 +144,7 @@ int main(int argc, char **argv) {
     m=M; //mla*mp;
     n=N; //nla*np;
    
-    np = sqrt(npe); // assume that the number of process is a square
+    np = isqrt(npe); // assume that the number of process is a square
     mp = np; // square grid
     
     mla = m/mp; // assume that the matrix dimension if a multiple of the process grid dimension
@@ -154,20 +154,10 @@ int main(int argc, char **argv) {
     nb = nla/scalapack_size;
     
     
-
-    
     // init CBLACS
     Cblacs_get( -1, 0, &icon );
     Cblacs_gridinit( &icon,"c", mp, np ); 
     Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
-    
-      
-    // there is a segmentation fault with matA block (0,150)
-    
-     // set the matrix descriptor
-    ierr=0;
-    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
-  
 
     // allocate local matrix
     la=malloc(sizeof(double)*mla*nla);
@@ -251,6 +241,12 @@ int main(int argc, char **argv) {
     
     printf("%d/%d: start computing \n",mype,npe);
     ierr = 0;
+    
+    // set the matrix descriptor
+    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    
+
+
     // compute norm 1 of the reduced normal matrix
     /*
     lwork = 2*mla+2*nla;
