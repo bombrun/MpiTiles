@@ -33,6 +33,12 @@ static int min( int a, int b ){
         if (a<b) return(a); else return(b);
 }
 
+/*
+void pdtrtrs (char *uplo , char *trans , char *diag , MKL_INT *n , MKL_INT *nrhs , 
+  double *a , MKL_INT *ia , MKL_INT *ja , MKL_INT *desca , 
+  double *b , MKL_INT *ib , MKL_INT *jb , MKL_INT *descb , MKL_INT *info );
+
+*/
 /**
  * set the local array store in la with dimenstions mla x nla with the values of matA woth dimenstion m x n
  * mb x nb are the block dimensions
@@ -93,6 +99,14 @@ int main(int argc, char **argv) {
     int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
     
+    int idescbl[9];
+    double *lb;
+    double normb;
+    
+    int idescxl[9];
+    double *lx;
+    double normx;
+    
     int idesczl[9]; // matrix descriptors
     double *lz; // matrix values: al is the local array
     
@@ -118,7 +132,7 @@ int main(int argc, char **argv) {
       int n_b = 1;
       int index;
     int icon; // scalapack cblacs context
-    char job, jobz, uplo;
+    char normJob, jobz, uplo, trans, diag;
     
     double MPIt1, MPIt2, MPIelapsed;
     
@@ -245,30 +259,74 @@ int main(int argc, char **argv) {
     printf("%d/%d: start computing \n",mype,npe);
        // set the matrix descriptor
     ierr=0;
-    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
+    descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr); // processor grip id start at 0
     if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
+    
+    
+    ierr=0;
+    descinit_(idescbl, &m, &one  , &mb, &nb , &zero, &zero, &icon, &nla, &ierr); // processor grip id start at 0
+    lb = calloc(sizeof(double),mla);
+    
+    ierr=0;
+    // set x
+    descinit_(idescxl, &n, &one  , &mb, &nb , &zero, &zero, &icon, &nla, &ierr); // processor grip id start at 0
+    lx = calloc(sizeof(double),mla);
+    for(i=0;i<mla;i++){
+      lx[i] = 1.0/m;
+    }
+    pddot_(&n,&normx,lx,&one,&one,idescxl,&one,lx,&one,&one,idescxl,&one); // normx <- x'x
+    if (mype==0) printf("%d/%d: normx2 %E \n",mype,npe,normx);  
+    
+    
+    ierr=0;
+    // set b
+    double alpha =1.0;
+    double beta =0.0;
+    trans = 'N';
+    pdgemv_(&trans,&m,&n,&alpha,la,&one,&one,idescal,lx,&one,&one,idescxl,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A x
+    pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
+    if (mype==0) printf("%d/%d: normb2 %E \n",mype,npe,normb);  
+    
     
     ierr = 0;
     // compute norm 1 of the reduced normal matrix
-    /*
+    /* DO NOT WORK
     lwork = 2*mla+2*nla;
     work = malloc(sizeof(double)*lwork);
-    job = '1';
-    norm = pdlansy_(&job, &uplo, &n, la, &one, &one, idescal, work); 
+    normJob = '1';
+    norm = pdlansy_(&normJob, &uplo, &n, la, &one, &one, idescal, work);  // matrix index start at one 
     printf("%d/%d: norm %f \n",mype,npe,norm);
     free(work);
     */
     
     ierr = 0;
     // compute the cholesky decomposition 
-    /*  
+    printf("%d/%d: start computing cholesky factor\n",mype,npe);  
     pdpotrf_(&uplo,&n,la,&one,&one,idescal,&ierr);
-    printf("%d/%d: finished computing cholesky factor\n",mype,npe);
-    openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
-    saveLocalMatrix(la,nla,mla,scaStore);
-    */
+    printf("%d/%d: finish computing cholesky factor\n",mype,npe);
+    //openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
+    //saveLocalMatrix(la,nla,mla,scaStore);
     
+    ierr =0;
+    // assume x and b set
+    // assume cholesky decomposition
+    // compute the soluation A x = b
+    diag = 'N';
+    printf("%d/%d: start solving\n",mype,npe);  
+    //pdpptrs_(&uplo, &trans , &diag , &n , &one , la , &one , &one , idescal , lb , &one , &one , idescbl , &ierr); // solve triangular system
+    //pdtrtrs (&uplo, &trans , &diag , &n , &n , la , &one , &one , idescal , lb , &one , &one , idescbl , &ierr);
+    pdpotrs_(&uplo, &n , &one , la , &one , &one , idescal , lb , &one , &one , idescbl , &ierr); // b<- A-1 b
+    
+    alpha = -1.0;
+    normb=0;
+    pdaxpy_(&n,&alpha,lx,&one,&one,idescxl,&one,lb,&one,&one,idescbl,&one); // b<-b-x
+    pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
+    if (mype==0) printf("%d/%d: finish solving, norm2(sol-true) %E \n",mype,npe,normb);  
+    
+    
+
     ierr = 0;
+    /*
     // compute the eigen values
     jobz= 'N'; uplo='U'; // with N z is ignored
     descinit_(idesczl, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr);
@@ -290,15 +348,17 @@ int main(int argc, char **argv) {
 	saveMatrix(n,w,"eigenvalues.txt");
 	//printf("%d/%d: finished job in %8.2fs\n",mype,npe,MPIelapsed); // not working
     }
-
+    */
+    
     ierr = 0;
     // compute the conditioner number assume that the norm and the cholesky decomposition have been computed
-    /*
+    /* DO NOT WORK
     lwork = 2*mla+3*nla;
+    printf("%d/%d: lwork=%d @%p\n",mype,npe,lwork,&lwork);
     work2 = malloc(sizeof(double)*lwork);
-    liwork = 2*mla;
+    liwork = 2*mla+3*nla;
     iwork = malloc(sizeof(int)*liwork);
-    pdpocon_("L",&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
+    pdpocon_(&uplo,&n,la,&one,&one,idescal,&norm,&cond,work2,&lwork,iwork,&liwork,&ierr);
     printf("%d/%d: condition number %f \n",mype,npe,cond);
     */
     

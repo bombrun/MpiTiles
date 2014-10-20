@@ -40,7 +40,7 @@ void readScalapackStore(FILE** store, int myrow, int mycol, const char* location
 int saveLocalMatrix(double* lmat,int nla, int mla, FILE* store) {
     long i;
     for(i = 0; i<(nla*mla) ; i++) {
-        fprintf(store,"%f\n",lmat[i]);
+        fprintf(store,"%e\n",lmat[i]);
     }
     return 0;
 }
