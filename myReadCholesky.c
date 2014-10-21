@@ -32,7 +32,7 @@ int isqrt(int c);
 
 
 int saveMatrix(int dim, double * mat, const char* fileName);
-
+int loadMatrix(int dim, double ** mat, const char* fileName);
 /*
  * solve the reduced normal equation
  * should be called after Cblas_pinfo
@@ -86,10 +86,13 @@ int main(int argc, char **argv) {
 	exit( -1);
     }
     rhs = malloc(sizeof(double)*N);
+    /* ONLY FOR TESTING !!!!!!
     for(i=0;i<N;i++){
       rhs[i]=1.0/N;
     }
     saveMatrix(N,rhs,"rhs.txt");
+    */
+    loadMatrix(N,&rhs,"rhs.txt");
     out = calloc(sizeof(double),N); // local 
     solveRhs(mype,npe,rhs, n_blocks, scalapack_size, N, scaStore_location,&out);
     if (mype==0) saveMatrix(N,out,"sol.txt");
@@ -246,7 +249,22 @@ int saveMatrix(int dim, double * mat, const char* fileName) {
 }
 
 
-
+int loadMatrix(int dim, double ** mat, const char* fileName) {
+    int i;
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+    FILE * fp = NULL;
+    fp = fopen(fileName,"r");
+    for(i = 0; i<dim ; i++) {
+	if ( (read = getline(&line, &len, fp)) != -1) {
+	  (*mat)[i] = atof(line);
+	}
+    }
+    free(line);
+    fclose(fp);
+    return 0;
+}
 
 
 /**
