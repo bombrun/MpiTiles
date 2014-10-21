@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <float.h>
+
 #include "matrixScalapackStore.h"
 
 void openScalapackStore(FILE** store, int myrow, int mycol, const char* location){
@@ -40,7 +42,7 @@ void readScalapackStore(FILE** store, int myrow, int mycol, const char* location
 int saveLocalMatrix(double* lmat,int nla, int mla, FILE* store) {
     long i;
     for(i = 0; i<(nla*mla) ; i++) {
-        fprintf(store,"%e\n",lmat[i]);
+        fprintf(store,"%.*f\n",DBL_DIG,lmat[i]); // use all available precision cf float.h
     }
     return 0;
 }

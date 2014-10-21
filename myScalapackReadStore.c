@@ -45,9 +45,9 @@ void pdtrtrs (char *uplo , char *trans , char *diag , MKL_INT *n , MKL_INT *nrhs
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
  * Compile on linux with scalapack and openmpi 
- * mpicc -O1 -o eigen.exe myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
+ * mpicc -O1 -o cholesky.mpi myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
  * run with
- * mpirun -n 4 eigen.exe 4 4
+ * mpirun -n 4 cholesky.mpi 4 4
  * 
  * assume that 
  * mpirun -n 4 bigmatrix.mpi 4
@@ -304,8 +304,14 @@ int main(int argc, char **argv) {
     printf("%d/%d: start computing cholesky factor\n",mype,npe);  
     pdpotrf_(&uplo,&n,la,&one,&one,idescal,&ierr);
     printf("%d/%d: finish computing cholesky factor\n",mype,npe);
-    //openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
-    //saveLocalMatrix(la,nla,mla,scaStore);
+    openScalapackStore(&scaStore,myrow,mycol,scaStore_location);
+    saveLocalMatrix(la,nla,mla,scaStore);
+    
+    double test=0.0;
+    for(i=0;i<nla*mla;i++){
+	test += la[i]*la[i];
+    }
+    printf("%d/%d: finished computing cholesky, test=%f \n",mype,npe,test);
     
     ierr =0;
     // assume x and b set
