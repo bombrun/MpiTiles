@@ -29,30 +29,40 @@ extern void pdsyev_( char *jobz, char *uplo, int *n, double *a, int *ia, int *ja
     return n
     */
 int isqrt(int c);
+
+
 int saveMatrix(int dim, double * mat, const char* fileName);
 
-/**
-* 
-* Compile on linux with scalapack and openmpi 
-* mpicc -O1 -o readChol.mpi myReadCholesky.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
-* run with
-* mpirun -n 4 readChol.mpi 4 4
-* 
-* assume that 
-* mpirun -n 4 cholesky.mpi 4
-* was run successfully
-*/
+/*
+ * solve the reduced normal equation
+ * should be called after Cblas_pinfo
+ * parameters :
+ * 	mpye process 
+ * 	npe number of processes
+ * 	rhs the value of the right hand side of the equation
+ * 	n_blocks the number of diagonal block used to compute the reduced normal matrix
+ * 	scalapack_size used to compute the reduced normal matrix
+ * 	N the dimension of the reduced normal equation
+ * 	scaStore_location the location of the Cholesky factor of the reduced normal matrix
+ * 	out will contain the solution
+ */
+double solveRhs(int mype, int npe, double * rhs, int n_blocks, int scalapack_size, int N, const char* scaStore_location,double **out);
 
-
-double reduceAndSolveRhs(int mype, int npe, double * rhs, int n_blocks, int scalapack_size, int N, const char* scaStore_location,double **out);
-
-/* Test program 
-* created 23/09/2014
-* author Alex Bombrun
-* 
-* icc -O1  -o eigen.exe lapackReadStore.c mpiutil.c normals.c matrixBlockStore.c -mkl
-* ./eigen.exe 4 4
-*
+/* 
+ * 
+ * A program that use precomputed cholesky factor of the reduced normal matrix
+ * created 23/09/2014
+ * author Alex Bombrun
+ * 
+ * Compile on linux with scalapack and openmpi 
+ * mpicc -O1 -o readChol.mpi myReadCholesky.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
+ * run with
+ * mpirun -n 4 readChol.mpi 4 4
+ * 
+ * assume that 
+ * mpirun -n 4 cholesky.mpi 4
+ * was run successfully
+ *
 */
 int main(int argc, char **argv) {
     int n_blocks;
@@ -81,12 +91,12 @@ int main(int argc, char **argv) {
     }
     saveMatrix(N,rhs,"rhs.txt");
     out = calloc(sizeof(double),N); // local 
-    reduceAndSolveRhs(mype,npe,rhs, n_blocks, scalapack_size, N, scaStore_location,&out);
+    solveRhs(mype,npe,rhs, n_blocks, scalapack_size, N, scaStore_location,&out);
     if (mype==0) saveMatrix(N,out,"sol.txt");
     Cblacs_exit( 0 );
 }
 
-double reduceAndSolveRhs(int mype, int npe, double * rhs, int n_blocks, int scalapack_size, int N, const char* scaStore_location, double ** out){
+double solveRhs(int mype, int npe, double * rhs, int n_blocks, int scalapack_size, int N, const char* scaStore_location, double ** out){
     FILE* scaStore;
     
     int M;
