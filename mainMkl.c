@@ -8,7 +8,9 @@
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
 
-/* Main program 
+/* 
+ * same as mainInde.c but use mkl cblas_dgemm
+ * Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
   created 7/09/2014
   author Alex Bombrun
@@ -34,7 +36,7 @@ int main(int argc, char **argv) {
     
     const char* matrixGtAB_location = "./data/SparseGtAB";
       
-    int i, j, t; 	 // loop indices
+    int i, t; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
     int idim,jdim;

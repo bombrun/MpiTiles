@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <float.h>
+
 #include "matrixBlockStore.h"
 
 void openStore(FILE** store, int i_block, const char* location){
@@ -45,7 +47,7 @@ int saveBlock(int i0, int i1, int j0, int j1, double * mat,FILE* store) {
     fprintf(store,"#%d,%d,%d,%d\n",i0,i1,j0,j1);
     int size = (i1-i0)*(j1-j0);
     for(i = 0; i<size ; i++) {
-        fprintf(store,"%f\n",mat[i]);
+	fprintf(store,"%.*f\n",DBL_DIG,mat[i]); // use all available precision cf float.h
     }
     return 0;
 }

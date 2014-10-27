@@ -7,11 +7,6 @@
 #include "mpiutil.h"
 #include "matrixBlockStore.h"
 
-/**
- * this function is NOT WORKING
- */
-int setMatrixNormal(const char* location,int** profile, double** values);
-
 /* Main program 
   a straight forward implementation to read the input matrices and build the reduced normal matrix for the global block
   created 7/09/2014
@@ -42,7 +37,7 @@ int main(int argc, char **argv) {
     
     const char* matrixGtAB_location = "./data/SparseGtAB";
       
-    int i, j, t; 	 // loop indices
+    int i, t; 	 // loop indices
     int i0, i1;  // main row numbers of matrix (CABG)' to be processed
     int j0, j1;  // secondary row numbers
     int idim,jdim;
@@ -69,7 +64,7 @@ int main(int argc, char **argv) {
     n_blocks = get_n_blocks(argc,argv,p);
     n_pTasks = get_n_pTasks(p,rank,n_blocks);
   
-    // set up the input matrices
+    // set up the input matrices AB and G
     profileAB_length = getNumberOfLine(profileAB_file_name);
     profileAB = malloc( sizeof(int) * profileAB_length );
     readMatrixInt(profileAB,profileAB_file_name);
@@ -83,13 +78,9 @@ int main(int argc, char **argv) {
     dimensionG = sumVectorInt(profileG,profileG_length);
     matrixG = calloc(dimensionG,sizeof(double));
     readMatrixDouble(matrixG,valuesG_file_name);
-      
-    //profileAB_length = setMatrixNormal(AB_location,&profileAB,&matrixAB);
-    //profileG_length  = setMatrixNormal(G_location,profileG,matrixG);
     
     printf("%d/%d: inde, number of attitude parameters=%d , number of source global parameters=%d , number of blocks=%d\n", rank, p, profileAB_length, profileG_length,n_blocks);
     
-
    for(t=0;t<n_pTasks;t++){
       i_block = (rank+t*p); // the diagonal block index depends on the rank index and the task index
       n_blockTasks = get_n_blockTasks(i_block,n_blocks);
@@ -110,11 +101,9 @@ int main(int argc, char **argv) {
       matrixCor = calloc(idim*jdim,sizeof(double));
       setBlockMatrix(matrixCor,i0,i1,i0,i1,matrixG,profileG_length,profileG);   
       dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABi,jdim,profileAB_length,matrixCor,idim,jdim);
-      //saveMatrixBlock(i0,i1,i0,i1,matrixCor,"./data/ReducedBlockMatrixG");
       saveBlock(i0,i1,i0,i1,matrixCor,store);
       free(matrixCor);
       printf("%d/%d: finished computing block (%d,%d)x(%d,%d) of the correction\n", rank, p, i0, i1, i0, i1);
-      
       
       for(i=1;i<n_blockTasks;i++){  // off diagonal blocks
 	  j_block = mpi_get_diag_block_id(i_block, i, n_blocks);
@@ -128,40 +117,15 @@ int main(int argc, char **argv) {
 	  matrixCor = calloc(idim*jdim,sizeof(double));
 	  setBlockMatrix(matrixCor,i0,i1,j0,j1,matrixG,profileG_length,profileG);
 	  dgemmAlex(matrixCGABi,idim,profileAB_length,matrixCGABj,jdim,profileAB_length,matrixCor,idim,jdim);
-	  //saveMatrixBlock(i0,i1,j0,j1,matrixCor,"./data/ReducedBlockMatrixG");
 	  saveBlock(i0,i1,j0,j1,matrixCor,store);
 	  printf("%d/%d: block %d (%d,%d) linked with block %d (%d,%d) finished \n",rank, p, i_block, i0, i1, j_block, j0, j1);
 	  free(matrixCor);
 	  free(matrixCGABj);
-	  //MPI_Barrier(MPI_COMM_WORLD); // to prevent memory acess to the same file -> useless does not improve things
-
       }
       fclose(store);
       free(matrixCGABi); 
     }
     MPI_Finalize(); // the process are independent no blocking
     return ierr;
-}
-
-int setMatrixNormal(const char* location, int** profile, double** values){
-  // WOULD BE NICE BUT IT IS NOT WORKING, allocation setting in the same function seems to be tricky in C
-    char* profile_file_name=  malloc(sizeof(char)*(strlen(location)+strlen("profile.txt")));
-    char* values_file_name =  malloc(sizeof(char)*(strlen(location)+strlen("values.txt")));
-    int profile_length, size;
-    
-    sprintf(profile_file_name,"%s/%s",location,"profile.txt");
-    sprintf(values_file_name,"%s/%s",location,"values.txt");
- 
-    profile_length = getNumberOfLine(profile_file_name);
-    *profile = calloc( profile_length ,sizeof(int) );
-    readMatrixInt(*profile,profile_file_name);
-    
-    size = sumVectorInt(*profile,profile_length);
-    *values = calloc( size, sizeof(double));
-    readMatrixDouble(*values,values_file_name);
-     
-    free(profile_file_name);
-    free(values_file_name);
-    return profile_length;
 }
 

@@ -66,7 +66,8 @@ double solveRhs(int mype, int npe, double * rhs, int n_blocks, int scalapack_siz
 */
 int main(int argc, char **argv) {
     int n_blocks;
-    int scalapack_size;
+    int scalapack_size;ls
+    
     int N, i;
     double * out;
     double * rhs;

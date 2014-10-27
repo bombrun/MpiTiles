@@ -49,7 +49,7 @@ void pdtrtrs (char *uplo , char *trans , char *diag , MKL_INT *n , MKL_INT *nrhs
  * Compile on linux with scalapack and openmpi 
  * mpicc -O1 -o cholesky.mpi myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
  * run with
- * mpirun -n 4 cholesky.mpi 4 4
+ * mpi
  * 
  * assume that 
  * mpirun -n 4 bigmatrix.mpi 4
