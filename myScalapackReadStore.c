@@ -8,6 +8,8 @@
 
 #include "matrixScalapackStore.h"
 
+#include "mysca.h"
+
 extern void   Cblacs_pinfo( int* mypnum, int* nprocs);
 extern void   Cblacs_get( int context, int request, int* value);
 extern int    Cblacs_gridinit( int* context, char * order, int np_row, int np_col);

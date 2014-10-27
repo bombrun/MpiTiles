@@ -88,10 +88,10 @@ int main(int argc, char **argv) {
     
     int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
-    
+
     int idesczl[9]; // matrix descriptors
     double *lz; // matrix values: al is the local array
-    
+
     double *w;
    
     
@@ -107,14 +107,14 @@ int main(int argc, char **argv) {
     double *work = NULL;
     double * work2 = NULL;
     int *iwork = NULL;
-    int  lwork, liwork;
+    int lwork, liwork;
 
 
      float ll,mm,cr,cc;
       int ii,jj,pr,pc,h,g; // ii,jj coordinates of local array element
       int rsrc=0,csrc=0; // assume that 0,0 element should be stored in the 0,0 process
       int n_b = 1;
-      int index;
+    int index;
     int icon; // scalapack cblacs context
     char job, jobz, uplo;
     
@@ -275,11 +275,14 @@ int main(int argc, char **argv) {
     w = malloc(sizeof(double)*m);
     lwork = -1;
     work = malloc(sizeof(double)*2);
+    printf("%d/%d: matrices for eigenvalues decomposition allocated \n",mype,npe);
     pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // only compute lwork
     //pdsyev_( &jobz, &uplo, &n, A, &ione, &ione, descA, W, Z, &ione, &ione, descZ, work, &lwork, &info );
     lwork= (int) work[0];
     free(work);
-    work = (double *)calloc(lwork,sizeof(double)) ;
+    printf("%d/%d: try to allocate the working matrix with size %d \n",mype,npe,lwork);
+    work = malloc(lwork*sizeof(double)) ;
+    printf("%d/%d: start computing eigenvalues \n",mype,npe);
     //MPIt1 = MPI_Wtime();
     pdsyev_( &jobz, &uplo, &n, la, &one, &one, idescal, w, lz, &one, &one, idesczl, work, &lwork, &ierr);   // compute the eigen values
     //MPIt2 = MPI_Wtime();
@@ -291,7 +294,7 @@ int main(int argc, char **argv) {
     }
 
 
-    printf("%d/%d: finished computing \n",mype,npe);
+    printf("%d/%d: finished computing eigenvalues\n",mype,npe);
     // if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
 
     free(la);
