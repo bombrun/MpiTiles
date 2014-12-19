@@ -48,9 +48,9 @@ void pdtrtrs (char *uplo , char *trans , char *diag , MKL_INT *n , MKL_INT *nrhs
  * myrow, mycol are the current process position in the grid of dimensions mp x np
  * 
  * Compile on linux with scalapack and openmpi 
- * mpicc -O1 -o cholesky.mpi myScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
+ * mpicc -O1 -o kcholesky.mpi kernelScalapackReadStore.c mpiutil.c normals.c matrixBlockStore.c matrixScalapackStore.c -L/opt/scalapack/lib/ -lscalapack -llapack -lrefblas -lgfortran -lm
  * run with
- * mpi
+ * mpirun -n 4 kcholesky 4 5
  * 
  * assume that 
  * mpirun -n 4 bigmatrix.mpi 4
@@ -83,12 +83,15 @@ int main(int argc, char **argv) {
     int i_block, j_block;
     int dim[4];
     double * mat;  // local matrix block use for reading
+    
+    double * matK; // the kernel matrix ng x 6
         
     int t, t_block;
     
     const char* profileG_file_name= "./data/NormalsG/profile.txt";
     const char* store_location = "./data/ReducedNormals";
     const char* scaStore_location ="./data/CholeskyReducedNormals";
+    const char* kernel_file_name ="./data/kernel.txt";
     
     int mp;	 // number of rows in the processor grid
     int mla;   // number of rows in the local array
@@ -109,6 +112,10 @@ int main(int argc, char **argv) {
     int idescxl[9];
     double *lx;
     double normx;
+
+    int idesck1l[9];
+    double *lk1;
+    double normk1;
     
     int idesczl[9]; // matrix descriptors
     double *lz; // matrix values: al is the local array
@@ -178,7 +185,7 @@ int main(int argc, char **argv) {
     Cblacs_gridinfo( icon, &mp_ret, &np_ret, &myrow, &mycol);
     
    
-
+    // read blocks and set the reduced normal matrix in scalapack grid
     // allocate local matrix
     la=malloc(sizeof(double)*mla*nla);
     printf("%d/%d: full matrix (%d,%d), local matrix (%d,%d), processor grid (%d,%d), block (%d,%d) \n", mype, npe, m, n, mla, nla, np, mp, mb, nb);
@@ -259,6 +266,32 @@ int main(int argc, char **argv) {
     
     printf("%d/%d: finished scaterring the matrix \n",mype,npe);
     
+    
+    // read the kernel matrix
+    printf("%d/%d: set kernel \n",mype,npe);
+    matK = malloc(N * 6*  sizeof(double));
+    readMatrixDouble(matK,kernel_file_name);
+    
+    // set k1
+    lk1 = calloc(sizeof(double),mla);
+    
+    for(i = 0; i<N; i++) {
+        // finding out which pe gets i element
+        cr = (float)( i/mb );
+        h = rsrc+(int)(cr);
+        pr = h%np;
+        // check if process should get this element
+        if (myrow == pr) {
+            // ii = x + l*mb
+            ll = (float)( ( i/(np*mb) ) );  // thinks seems to be mixed up does not matter as long as the matrix, the block and the grid is symmetric
+            ii = i%mb + (int)(ll)*mb;
+            lk1[ii] = matK[N*0+i];
+        }
+    }
+    printf("%d/%d: finished scaterring the kernel vector \n",mype,npe);
+   			    
+			    
+    
     printf("%d/%d: start computing \n",mype,npe);
        // set the matrix descriptor
     ierr=0;
@@ -280,11 +313,27 @@ int main(int argc, char **argv) {
     pddot_(&n,&normx,lx,&one,&one,idescxl,&one,lx,&one,&one,idescxl,&one); // normx <- x'x
     if (mype==0) printf("%d/%d: normx2 %E \n",mype,npe,normx);  
     
+    ierr=0;
+    // set k1
+    descinit_(idesck1l, &n, &one  , &mb, &nb , &zero, &zero, &icon, &nla, &ierr); // processor grip id start at 0
+    pddot_(&n,&normk1,lk1,&one,&one,idesck1l,&one,lk1,&one,&one,idesck1l,&one); // normx <- x'x
+    if (mype==0) printf("%d/%d: normk1 square %E \n",mype,npe,normk1);  
+    
     
     ierr=0;
     // set b
     double alpha =1.0;
     double beta =0.0;
+    trans = 'N';
+    pdgemv_(&trans,&m,&n,&alpha,la,&one,&one,idescal,lk1,&one,&one,idesck1l,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A k1
+    pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
+    if (mype==0) printf("%d/%d: is kernel, normb square %E \n",mype,npe,normb); 
+
+    
+    ierr=0;
+    // set b
+    alpha =1.0;
+    beta =0.0;
     trans = 'N';
     pdgemv_(&trans,&m,&n,&alpha,la,&one,&one,idescal,lx,&one,&one,idescxl,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A x
     pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
