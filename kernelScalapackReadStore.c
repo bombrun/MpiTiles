@@ -54,7 +54,7 @@ void pdtrtrs (char *uplo , char *trans , char *diag , MKL_INT *n , MKL_INT *nrhs
  * 
  * assume that 
  * mpirun -n 4 bigmatrix.mpi 4
- * was run successfully
+ * was run successfully, i.e. in ./data one should have ./data/ReducedNormals 
  */
 void setLocalArray(double *matA, int m, int n, double *la, int mla, int nla,int mb, int nb, int myrow, int mycol, int mp, int np);
 
@@ -105,6 +105,9 @@ int main(int argc, char **argv) {
     int idescal[9]; // matrix descriptors
     double *la; // matrix values: al is the local array
     
+    int idescaal[9];
+    double *laa;
+    
     int idescbl[9];
     double *lb;
     double normb;
@@ -142,7 +145,7 @@ int main(int argc, char **argv) {
       int n_b = 1;
       int index;
     int icon; // scalapack cblacs context
-    char normJob, jobz, uplo, trans, diag;
+    char normJob, jobz, uplo, trans, notrans, diag;
     
     double MPIt1, MPIt2, MPIelapsed;
     
@@ -297,7 +300,10 @@ int main(int argc, char **argv) {
     ierr=0;
     descinit_(idescal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr); // processor grip id start at 0
     if (mype==0) saveMatrixDescriptor(idescal, scaStore_location);
-    
+  
+    ierr=0;
+    descinit_(idescaal, &m, &n  , &mb, &nb , &zero, &zero, &icon, &mla, &ierr); // processor grip id start at 0
+  
     
     ierr=0;
     descinit_(idescbl, &m, &one  , &mb, &nb , &zero, &zero, &icon, &nla, &ierr); // processor grip id start at 0
@@ -320,12 +326,13 @@ int main(int argc, char **argv) {
     if (mype==0) printf("%d/%d: normk1 square %E \n",mype,npe,normk1);  
     
     
+    
     ierr=0;
     // set b
     double alpha =1.0;
     double beta =0.0;
-    trans = 'N';
-    pdgemv_(&trans,&m,&n,&alpha,la,&one,&one,idescal,lk1,&one,&one,idesck1l,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A k1
+    notrans = 'N';
+    pdgemv_(&notrans,&m,&n,&alpha,la,&one,&one,idescal,lk1,&one,&one,idesck1l,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A k1
     pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
     if (mype==0) printf("%d/%d: is kernel, normb square %E \n",mype,npe,normb); 
 
@@ -334,11 +341,56 @@ int main(int argc, char **argv) {
     // set b
     alpha =1.0;
     beta =0.0;
-    trans = 'N';
-    pdgemv_(&trans,&m,&n,&alpha,la,&one,&one,idescal,lx,&one,&one,idescxl,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A x
+    notrans = 'N';
+    pdgemv_(&notrans,&m,&n,&alpha,la,&one,&one,idescal,lx,&one,&one,idescxl,&one,&beta,lb,&one,&one,idescbl,&one); // b <- A x
     pddot_(&n,&normb,lb,&one,&one,idescbl,&one,lb,&one,&one,idescbl,&one); // norm <- b'b
     if (mype==0) printf("%d/%d: normb2 %E \n",mype,npe,normb);  
+   
     
+    // set aa
+    printf("%d/%d: start setting aa with k1 x k1\' \n",mype,npe);
+  
+    alpha = 1.0;
+    beta = 1.0;
+    trans = 'T';
+    notrans = 'N';
+    // laa=malloc(sizeof(double)*mla*nla); // for debugging
+    //pdgemm(transa, transb, 
+    //		m, n, k, 
+    //		alpha, a, ia , ja , desca, 
+    //		b, ib , jb ,descb, 
+    //		beta, c, ic , jc , descc)
+    // A = k1 (Nx1)
+    // B = k1 (Nx1)
+    // C = aa (MxN)  ... M=N
+    // C <- C + A x B'    
+    pdgemm_(&notrans, &trans,
+                   &N, &N, &one,
+                   &alpha, lk1, &one, &one, idesck1l,
+		   lk1, &one, &one, idesck1l,
+                   &beta,  la, &one, &one, idescal );
+      
+    
+    for(j = 1; j<6; j++) {
+        for(i = 0; i<N; i++) {
+            // finding out which pe gets i element
+            cr = (float)( i/mb );
+            h = rsrc+(int)(cr);
+            pr = h%np;
+            // check if process should get this element
+            if (myrow == pr) {
+                // ii = x + l*mb
+                ll = (float)( ( i/(np*mb) ) );  // thinks seems to be mixed up does not matter as long as the matrix, the block and the grid is symmetric
+                ii = i%mb + (int)(ll)*mb;
+                lk1[ii] = matK[N*j+i];
+            }
+        }
+         pdgemm_(&notrans, &trans,
+                   &N, &N, &one,
+                   &alpha, lk1, &one, &one, idesck1l,
+		   lk1, &one, &one, idesck1l,
+                   &beta,  la, &one, &one, idescal );
+    }
     
     ierr = 0;
     // compute norm 1 of the reduced normal matrix
